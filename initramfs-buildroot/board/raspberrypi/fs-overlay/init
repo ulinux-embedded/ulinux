@@ -1,0 +1,56 @@
+#!/bin/sh
+
+ROOTFS="/dev/mmcblk0p2"
+ROOTFS_MOUNT="/mnt/root"
+OVERLAYFS="/dev/mmcblk0p3"
+OVERLAYFS_MOUNT="/mnt/overlay"
+NEWROOT="/mnt/new_root"
+
+rescue_shell() {
+  echo "Something went wrong. Dropping to a shell."
+  exec sh
+}
+
+# Mount the /proc and /sys filesystems.
+mount -t proc none /proc
+mount -t sysfs none /sys
+mount -t devtmpfs none /dev
+
+echo 1 > /proc/sys/kernel/printk
+
+echo "Minimal initramfs switch_root script running"
+
+echo "Attempting to mount \${DEVICE} as the new root"
+
+# Mount the root filesystem.
+if ! mount -o rw ${ROOTFS} ${ROOTFS_MOUNT};
+then
+  echo "Failed to mount \${ROOTFS} as rootfs. :/"
+  rescue_shell
+fi
+
+# Mount the overlay filesystem.
+if ! mount -o rw ${OVERLAYFS} ${OVERLAYFS_MOUNT};
+then
+  echo "Failed to mount \${OVERLAYFS} as overlayfs. :/"
+  rescue_shell
+fi
+
+# Lay the overlay filesystem over root.
+mkdir -p ${NEWROOT}
+if ! mount -t overlay overlay -o lowerdir=${ROOTFS_MOUNT},upperdir=${OVERLAYFS_MOUNT}/upper,workdir=${OVERLAYFS_MOUNT}/work ${NEWROOT};
+then
+  echo "Failed to lay overlayfs over rootfs. :/"
+  rescue_shell
+fi
+
+# Clean up.
+mount --move /dev ${NEWROOT}/dev
+
+echo "Success, switching to the real root. :D"
+
+# Boot the real thing.
+exec switch_root ${NEWROOT} /sbin/init
+
+echo "Hum, something bad has happened..."
+rescue_shell
