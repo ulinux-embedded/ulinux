@@ -9,5 +9,11 @@ module.exports = {
 
   polling_interval: 60, // seconds
 
+  logs: {
+    file: 'dd.log',
+    file_level: 'debug',
+    console_level: 'debug',
+  },
+
   image_path: '/updates/image.img',
 }
