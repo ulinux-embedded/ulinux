@@ -12,3 +12,5 @@
 *.rej
 *~
 *.pyc
+
+board/raspberrypi/fs-overlay/etc/build
