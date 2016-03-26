@@ -20,19 +20,37 @@ echo 1 > /proc/sys/kernel/printk
 
 echo "Minimal initramfs switch_root script running"
 
+# Mount the overlay filesystem.
+echo "Attempting to mount \${OVERLAYFS} as overlayfs"
+if ! mount -o rw ${OVERLAYFS} ${OVERLAYFS_MOUNT};
+then
+  echo "Failed to mount \${OVERLAYFS} as overlayfs. :/"
+  rescue_shell
+fi
+
+echo "Looking for new update image"
+if [ -f ${OVERLAYFS_MOUNT}/upper/updates/image.img ];
+then
+  echo "Found new update image, proceeding with flash"
+  if dd if=${OVERLAYFS_MOUNT}/upper/updates/image.img of=${ROOTFS} bs=4M;
+  then
+    echo "Update image successfully flashed, deleting it"
+    rm ${OVERLAYFS_MOUNT}/upper/updates/image.img
+    echo "Finished deleting update image, proceeding with regular boot"
+  else
+    echo "Error flashing update image, dropping to rescue shell"
+    rescue_shell
+  fi
+else
+  echo "Did not find new update image, proceeding with regular boot"
+fi
+
 echo "Attempting to mount \${DEVICE} as the new root"
 
 # Mount the root filesystem.
 if ! mount -o rw ${ROOTFS} ${ROOTFS_MOUNT};
 then
   echo "Failed to mount \${ROOTFS} as rootfs. :/"
-  rescue_shell
-fi
-
-# Mount the overlay filesystem.
-if ! mount -o rw ${OVERLAYFS} ${OVERLAYFS_MOUNT};
-then
-  echo "Failed to mount \${OVERLAYFS} as overlayfs. :/"
   rescue_shell
 fi
 
