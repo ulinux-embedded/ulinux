@@ -63,12 +63,29 @@ function createFilesystems {
     if (cd $INITRAMFS_DIR &&
     make >>$LOGFILE 2>&1) &&
     (cd $ROOTFS_DIR &&
+    read num < board/raspberrypi/fs-overlay/etc/build && # These lines are for
+    num=$(($num+1)) &&                                   # creating a build num
+    echo $num > board/raspberrypi/fs-overlay/etc/build && # file in the rootfs
     make >>$LOGFILE 2>&1) &&
     if [ "$CREATE_IMAGE" = true ]
     then
       $SUDO_COMMAND dd if=$ROOTFS_DIR/output/images/rootfs.ext4 of=/dev/loop0p2 bs=4M >>$LOGFILE 2>&1
+
+      # Copy relevant raspberrypi files to boot/
+      $SUDO_COMMAND cp initramfs-buildroot/output/images/rpi-firmware/bootcode.bin mnt/boot/
+      $SUDO_COMMAND cp initramfs-buildroot/output/images/rpi-firmware/start.elf mnt/boot/
+      $SUDO_COMMAND cp initramfs-buildroot/output/images/rpi-firmware/fixup.dat mnt/boot/
+      $SUDO_COMMAND cp initramfs-buildroot/output/images/rpi-firmware/config.txt mnt/boot/
+
+      # Copy initramfs kernel to boot
+      $SUDO_COMMAND cp initramfs-buildroot/output/images/zImage mnt/boot/zImage
+
+      # Create overlayfs directories
+      $SUDO_COMMAND mkdir -p mnt/root_overlay/{upper,work,upper/updates}
+
       $SUDO_COMMAND umount mnt/boot >>$LOGFILE 2>&1
       $SUDO_COMMAND umount mnt/root_overlay >>$LOGFILE 2>&1
+      echo "Removing loopback device"
       $SUDO_COMMAND losetup -d /dev/loop0 >>$LOGFILE 2>&1
     fi;
 
