@@ -1,0 +1,13 @@
+module.exports = {
+  update_server: 'update:8443',
+  update_server_ca_cert: 'servers_ca.crt',
+
+  cert_path: 'device.crt',
+  key_path: 'device.key',
+
+  signing_server_pubkey: 'signing_pubkey.key',
+
+  polling_interval: 60, // seconds
+
+  image_path: '/updates/image.img',
+}
