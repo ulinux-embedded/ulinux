@@ -14,3 +14,4 @@
 *.pyc
 
 board/raspberrypi/fs-overlay/etc/build
+board/raspberrypi/fs-overlay/opt/ulinux-device-daemon
