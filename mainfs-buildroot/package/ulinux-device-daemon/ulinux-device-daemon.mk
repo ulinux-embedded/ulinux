@@ -13,10 +13,13 @@ ULINUX_DEVICE_DAEMON_LICENSE_FILES = LICENSE
 
 ULINUX_DEVICE_DAEMON_DEPENDENCIES = nodejs
 
+ULINUX_DEVICE_DAEMON_INSTALLDIR = $(TARGET_DIR)/opt/ulinux-device-daemon
+
 define ULINUX_DEVICE_DAEMON_INSTALL_TARGET_CMDS
-     $(INSTALL) -D -m 0755 $(@D)/* $(TARGET_DIR)/opt/ulinux-device-daemon
-     # Install package node_modules
-	 (cd $(TARGET_DIR)/opt/ulinux-device-daemon; $(NPM) install)
+		mkdir -p $(ULINUX_DEVICE_DAEMON_INSTALLDIR)
+		$(INSTALL) -D -m 0755 $(@D)/* $(ULINUX_DEVICE_DAEMON_INSTALLDIR)
+		# Install package node_modules
+		(cd $(ULINUX_DEVICE_DAEMON_INSTALLDIR); $(NPM) install)
 endef
 
 $(eval $(generic-package))
