@@ -1,13 +1,14 @@
-comment "imx-gpu-viv needs an (e)glibc toolchain"
+comment "imx-gpu-viv needs a glibc toolchain with armhf enabled"
 	depends on BR2_arm
-	depends on !BR2_TOOLCHAIN_USES_GLIBC
+	depends on !BR2_TOOLCHAIN_USES_GLIBC || !BR2_ARM_EABIHF
 
 config BR2_PACKAGE_IMX_GPU_VIV
 	bool "imx-gpu-viv"
 	select BR2_PACKAGE_HAS_LIBEGL
 	select BR2_PACKAGE_HAS_LIBGLES
 	select BR2_PACKAGE_HAS_LIBOPENVG
-	depends on BR2_arm # Only relevant for i.MX6
+	# Pre-built binaries only available for ARM EABIhf
+	depends on BR2_ARM_EABIHF
 	# Library binaries are linked against libc.so.6
 	depends on BR2_TOOLCHAIN_USES_GLIBC
 	help
@@ -33,8 +34,9 @@ choice
 config BR2_PACKAGE_IMX_GPU_VIV_OUTPUT_X11
 	bool "X11"
 	depends on BR2_PACKAGE_XORG7
-	select BR2_PACKAGE_XLIB_LIBXDAMAGE # Runtime dependency
-	select BR2_PACKAGE_XLIB_LIBXEXT # Runtime dependency
+	select BR2_PACKAGE_XLIB_LIBXDAMAGE
+	select BR2_PACKAGE_XLIB_LIBXEXT
+	select BR2_PACKAGE_XLIB_LIBXFIXES
 
 comment "X11 backend needs Xorg package"
 	depends on !BR2_PACKAGE_XORG7
@@ -61,6 +63,7 @@ config BR2_PACKAGE_PROVIDES_LIBOPENVG
 config BR2_PACKAGE_IMX_GPU_VIV_APITRACE
 	bool "install apitrace tools"
 	select BR2_PACKAGE_IMX_GPU_VIV_G2D
+	select BR2_PACKAGE_LIBPNG
 	help
 	  Copy the apitrace tool to the target. Apitrace consists
 	  of a set of tools to trace, replay and/or inspect OpenGL,

@@ -155,8 +155,8 @@ List of Examples
 
 ---------------------------------------------------------------------
 
-Buildroot 2015.11 manual generated on 2015-11-30 22:15:50 UTC from
-git revision 3f90e53
+Buildroot 2016.08.1 manual generated on 2016-09-21 20:57:15 UTC from
+git revision b1001ac
 
 The Buildroot manual is written by the Buildroot developers. It is
 licensed under the GNU General Public License, version 2. Refer to
@@ -298,6 +298,22 @@ and November. Release numbers are in the format YYYY.MM, so for
 example 2013.02, 2014.08.
 
 Release tarballs are available at http://buildroot.org/downloads/.
+
+For your convenience, a Vagrantfile [https://www.vagrantup.com/] is
+available in support/misc/Vagrantfile in the Buildroot source tree to
+quickly set up a virtual machine with the needed dependencies to get
+started.
+
+If you want to setup an isolated buildroot environment on Linux or
+Mac Os X, paste this line onto your terminal:
+
+curl -O https://buildroot.org/downloads/Vagrantfile; vagrant up
+
+If you are on Windows, paste this into your powershell:
+
+(new-object System.Net.WebClient).DownloadFile(
+"https://buildroot.org/downloads/Vagrantfile","Vagrantfile");
+vagrant up
 
 If you want to follow development, you can use the daily snapshots or
 make a clone of the Git repository. Refer to the Download page [http:
@@ -622,8 +638,8 @@ by itself a cross-compilation toolchain, before building the
 userspace applications and libraries for your target embedded system.
 
 This backend supports several C libraries: uClibc [http://
-www.uclibc.org], the glibc [http://www.gnu.org/software/libc/
-libc.html] and eglibc [http://www.eglibc.org].
+www.uclibc.org], glibc [http://www.gnu.org/software/libc/libc.html]
+and musl [http://www.musl-libc.org].
 
 Once you have selected this backend, a number of options appear. The
 most important ones allow to:
@@ -1326,9 +1342,10 @@ are:
   * --depth N, -d N, to limit the dependency depth to N levels. The
     default, 0, means no limit.
   * --stop-on PKG, -s PKG, to stop the graph on the package PKG. PKG
-    can be an actual package name, a glob, or the keyword virtual (to
-    stop on virtual packages). The package is still present on the
-    graph, but its dependencies are not.
+    can be an actual package name, a glob, the keyword virtual (to
+    stop on virtual packages), or the keyword host (to stop on host
+    packages). The package is still present on the graph, but its
+    dependencies are not.
   * --exclude PKG, -x PKG, like --stop-on, but also omits PKG from
     the graph.
   * --transitive, --no-transitive, to draw (or not) the transitive
@@ -1380,7 +1397,7 @@ When your target system grows, it is sometimes useful to understand
 how much each Buildroot package is contributing to the overall root
 filesystem size. To help with such an analysis, Buildroot collects
 data about files installed by each package and using this data,
-generates a graph and CSVs files detailing the size contribution of
+generates a graph and CSV files detailing the size contribution of
 the different packages.
 
 To generate these data after a build, run:
@@ -1397,9 +1414,9 @@ This will generate:
     contribution of each installed file to the package it belongs,
     and to the overall filesystem size.
 
-This size-stats target requires the Python Matplotlib library to be
+This graph-size target requires the Python Matplotlib library to be
 installed (python-matplotlib on most distributions), and also the
-argpase module if you’re using a Python version older than 2.7
+argparse module if you’re using a Python version older than 2.7
 (python-argparse on most distributions).
 
 Just like for the duration graph, a BR2_GRAPH_OUT environment is
@@ -1409,7 +1426,16 @@ environment variable.
 
 Note. The collected filesystem size data is only meaningful after a
 complete clean rebuild. Be sure to run make clean all before using
-make size-stats.
+make graph-size.
+
+To compare the root filesystem size of two different Buildroot
+compilations, for example after adjusting the configuration or when
+switching to another Buildroot release, use the size-stats-compare
+script. It takes two file-size-stats.csv files (produced by make
+graph-size) as input. Refer to the help text of this script for more
+details:
+
+support/scripts/size-stats-compare -h
 
 8.11. Integration with Eclipse
 
@@ -1661,9 +1687,9 @@ The normal operation of Buildroot is to download a tarball, extract
 it, configure, compile and install the software component found
 inside this tarball. The source code is extracted in output/build/
 <package>-<version>, which is a temporary directory: whenever make
-clean is used, this directory is entirely removed, and re-recreated
-at the next make invocation. Even when a Git or Subversion repository
-is used as the input for the package source code, Buildroot creates a
+clean is used, this directory is entirely removed, and re-created at
+the next make invocation. Even when a Git or Subversion repository is
+used as the input for the package source code, Buildroot creates a
 tarball out of it, and then behaves as it normally does with
 tarballs.
 
@@ -2087,7 +2113,7 @@ Post-build scripts (BR2_ROOTFS_POST_BUILD_SCRIPT)
         are stored
       + BASE_DIR: the base output directory
 
-Below two more methods of customizing the target filesystem are
+Below three more methods of customizing the target filesystem are
 described, but they are not recommended.
 
 Direct modification of the target filesystem
@@ -2133,6 +2159,39 @@ Custom target skeleton (BR2_ROOTFS_SKELETON_CUSTOM)
     skeleton, which prevents taking advantage of the fixes or
     improvements brought to the default skeleton in later Buildroot
     releases.
+
+Post-fakeroot scripts (BR2_ROOTFS_POST_FAKEROOT_SCRIPT)
+
+    When aggregating the final images, some parts of the process
+    requires root rights: creating device nodes in /dev, setting
+    permissions or ownership to files and directories… To avoid
+    requiring actual root rights, Buildroot uses fakeroot to simulate
+    root rights. This is not a complete substitute for actually being
+    root, but is enough for what Buildroot needs.
+
+    Post-fakeroot scripts are shell scripts that are called at the 
+    end of the fakeroot phase, right before the filesystem image
+    generator is called. As such, they are called in the fakeroot
+    context.
+
+    Post-fakeroot scripts can be useful in case you need to tweak the
+    filesystem to do modifications that are usually only available to
+    the root user.
+
+    Note: It is recommended to use the existing mechanisms to set
+    file permissions or create entries in /dev (see Section 9.5.1,
+    “Setting file permissions and ownership and adding custom devices
+    nodes”) or to create users (see Section 9.6, “Adding custom user
+    accounts”)
+
+    Note: The difference between post-build scripts (above) and
+    fakeroot scripts, is that post-build scripts are not called in
+    the fakeroot context.
+
+    Note;. Using fakeroot is not an absolute substitute for actually
+    being root. fakeroot only ever fakes the file access rights and
+    types (regular, block-or-char device…) and uid/gid; these are
+    emulated in-memory.
 
 9.5.1. Setting file permissions and ownership and adding custom
 devices nodes
@@ -2635,16 +2694,16 @@ Chapter 11. Known issues
     DO_XSI_MATH, UCLIBC_HAS_OBSOLETE_BSD_SIGNAL and
     UCLIBC_SV4_DEPRECATED are needed if one wants to build the
     ltp-testsuite package with uClibc. You need to either use a glibc
-    or eglibc based toolchain, or enable the appropriate options in
-    the uClibc configuration.
+    based toolchain, or enable the appropriate options in the uClibc
+    configuration.
   * The xfsprogs package does not build with the default uClibc
     configuration used by the Buildroot toolchain backend. You need
-    to either use a glibc or eglibc based toolchain, or enable the
-    appropriate options in the uClibc configuration.
+    to either use a glibc based toolchain, or enable the appropriate
+    options in the uClibc configuration.
   * The mrouted package does not build with the default uClibc
     configuration used by the Buildroot toolchain backend. You need
-    to either use a glibc or eglibc based toolchain, or enable the
-    appropriate options in the uClibc configuration.
+    to either use a glibc based toolchain, or enable the appropriate
+    options in the uClibc configuration.
   * The libffi package is not supported on the SuperH 2 and ARC
     architectures.
   * The prboom package triggers a compiler failure with the SuperH 4
@@ -2685,10 +2744,14 @@ directory, under the legal-info/ subdirectory. There you will find:
   * The source code for all packages; this is saved in the sources/
     and host-sources/ subdirectories for target and host packages
     respectively. The source code for packages that set <PKG>
-    _REDISTRIBUTE = NO will not be saved. Patches applied to some
-    packages by Buildroot are distributed with the Buildroot sources
-    and are not duplicated in the sources/ and host-sources/
-    subdirectories.
+    _REDISTRIBUTE = NO will not be saved. Patches that were applied
+    are also saved, along with a file named series that lists the
+    patches in the order they were applied. Patches are under the
+    same license as the files that they modify. Note: Buildroot
+    applies additional patches to Libtool scripts of autotools-based
+    packages. These patches can be found under support/libtool in the
+    Buildroot source and, due to technical limitations, are not saved
+    with the package sources. You may need to collect them manually.
   * A manifest file (one for host and one for target packages)
     listing the configured packages, their version, license and
     related information. Some of this information might not be
@@ -2720,6 +2783,8 @@ inform you of relevant material that could not be saved.
 Here is a list of the licenses that are most widely used by packages
 in Buildroot, with the name used in the manifest files:
 
+  * AGPLv3: GNU Affero General Public License, version 3 [http://
+    www.gnu.org/licenses/agpl-3.0.en.html];
   * GPLv2: GNU General Public License, version 2 [http://www.gnu.org/
     licenses/old-licenses/gpl-2.0.html];
   * GPLv2+: GNU General Public License, version 2 [http://www.gnu.org
@@ -2763,11 +2828,12 @@ in Buildroot, with the name used in the manifest files:
 
 Buildroot itself is an open source software, released under the GNU
 General Public License, version 2 [http://www.gnu.org/licenses/
-old-licenses/gpl-2.0.html] or (at your option) any later version.
-However, being a build system, it is not normally part of the end
-product: if you develop the root filesystem, kernel, bootloader or
-toolchain for a device, the code of Buildroot is only present on the
-development machine, not in the device storage.
+old-licenses/gpl-2.0.html] or (at your option) any later version,
+with the exception of the package patches detailed below. However,
+being a build system, it is not normally part of the end product: if
+you develop the root filesystem, kernel, bootloader or toolchain for
+a device, the code of Buildroot is only present on the development
+machine, not in the device storage.
 
 Nevertheless, the general view of the Buildroot developers is that
 you should release the Buildroot source code along with the source
@@ -2784,6 +2850,17 @@ considered part of the material that must be redistributed.
 Keep in mind that this is only the Buildroot developers' opinion, and
 you should consult your legal department or lawyer in case of any
 doubt.
+
+12.3.1. Patches to packages
+
+Buildroot also bundles patch files, which are applied to the sources
+of the various packages. Those patches are not covered by the license
+of Buildroot. Instead, they are covered by the license of the
+software to which the patches are applied. When said software is
+available under multiple licenses, the Buildroot patches are only
+provided under the publicly accessible licenses.
+
+See Chapter 18, Patching a package for the technical details.
 
 Chapter 13. Beyond Buildroot
 
@@ -3149,6 +3226,15 @@ itself should be indented with one tab and two spaces, lines should
 not be longer than 72 columns, and it must mention the upstream URL
 of the project.
 
+As a convention specific to Buildroot, the ordering of the attributes
+is as follows:
+
+ 1. The type of option: bool, string… with the prompt
+ 2. If needed, the default value(s)
+ 3. Any dependency of the depends on form
+ 4. Any dependency of the select form
+ 5. The help keyword and help text.
+
 You can add other sub-options into a if BR2_PACKAGE_LIBFOO…endif
 statement to configure particular things in your software. You can
 look at examples in other packages. The syntax of the Config.in file
@@ -3352,10 +3438,20 @@ the text to use in the comment.
 
       + Dependency symbol: BR2_USE_MMU
       + Comment string: no comment to be added
-  * Atomic instructions (whereby the architecture has instructions to
-    perform some operations atomically, like LOCKCMPXCHG on x86)
+  * Gcc _sync* built-ins used for atomic operations. They are
+    available in variants operating on 1 byte, 2 bytes, 4 bytes and 8
+    bytes. Since different architectures support atomic operations on
+    different sizes, one dependency symbol is available for each
+    size:
 
-      + Dependency symbol: BR2_ARCH_HAS_ATOMICS
+      + Dependency symbol: BR2_TOOLCHAIN_HAS_SYNC_1 for 1 byte,
+        BR2_TOOLCHAIN_HAS_SYNC_2 for 2 bytes,
+        BR2_TOOLCHAIN_HAS_SYNC_4 for 4 bytes,
+        BR2_TOOLCHAIN_HAS_SYNC_8 for 8 bytes.
+      + Comment string: no comment to be added
+  * Gcc _atomic* built-ins used for atomic operations.
+
+      + Dependency symbol: BR2_TOOLCHAIN_HAS_ATOMIC.
       + Comment string: no comment to be added
   * Kernel headers
 
@@ -3371,17 +3467,29 @@ the text to use in the comment.
         toolchain-common.in)
       + Comment string: gcc >= X.Y and/or gcc <= X.Y (replace X.Y
         with the proper version)
+  * Host GCC version
+
+      + Dependency symbol: BR2_HOST_GCC_AT_LEAST_X_Y, (replace X_Y
+        with the proper version, see Config.in)
+      + Comment string: no comment to be added
+      + Note that it is usually not the package itself that has a
+        minimum host GCC version, but rather a host-package on which
+        it depends.
   * C library
 
       + Dependency symbol: BR2_TOOLCHAIN_USES_GLIBC,
         BR2_TOOLCHAIN_USES_MUSL, BR2_TOOLCHAIN_USES_UCLIBC
       + Comment string: for the C library, a slightly different
-        comment text is used: foo needs an (e)glibc toolchain, or foo
-        needs an (e)glibc toolchain w/ C++
+        comment text is used: foo needs a glibc toolchain, or foo
+        needs a glibc toolchain w/ C++
   * C++ support
 
       + Dependency symbol: BR2_INSTALL_LIBSTDCPP
       + Comment string: C++
+  * Fortran support
+
+      + Dependency symbol: BR2_TOOLCHAIN_HAS_FORTRAN
+      + Comment string: fortran
   * thread support
 
       + Dependency symbol: BR2_TOOLCHAIN_HAS_THREADS
@@ -3601,7 +3709,7 @@ based on hand-written Makefiles or shell scripts.
 14: LIBFOO_DEPENDENCIES = host-libaaa libbbb
 15:
 16: define LIBFOO_BUILD_CMDS
-17:     $(MAKE) CC="$(TARGET_CC)" LD="$(TARGET_LD)" -C $(@D) all
+17:     $(MAKE) $(TARGET_CONFIGURE_OPTS) -C $(@D) all
 18: endef
 19:
 20: define LIBFOO_INSTALL_STAGING_CMDS
@@ -3615,16 +3723,16 @@ based on hand-written Makefiles or shell scripts.
 28:     $(INSTALL) -d -m 0755 $(TARGET_DIR)/etc/foo.d
 29: endef
 30:
-31: define LIBFOO_DEVICES
-32:     /dev/foo  c  666  0  0  42  0  -  -  -
+31: define LIBFOO_USERS
+32:     foo -1 libfoo -1 * - - - LibFoo daemon
 33: endef
 34:
-35: define LIBFOO_PERMISSIONS
-36:     /bin/foo  f  4755  0  0  -  -  -  -  -
+35: define LIBFOO_DEVICES
+36:     /dev/foo  c  666  0  0  42  0  -  -  -
 37: endef
 38:
-39: define LIBFOO_USERS
-40:     foo -1 libfoo -1 * - - - LibFoo daemon
+39: define LIBFOO_PERMISSIONS
+40:     /bin/foo  f  4755  foo  libfoo   -  -  -  -  -
 41: endef
 42:
 43: $(eval $(generic-package))
@@ -3707,14 +3815,14 @@ install the package in the target space.
 All these steps rely on the $(@D) variable, which contains the
 directory where the source code of the package has been extracted.
 
-On line 31..33, we define a device-node file used by this package
+On lines 31..43, we define a user that is used by this package (e.g.
+to run a daemon as non-root) (LIBFOO_USERS).
+
+On line 35..37, we define a device-node file used by this package
 (LIBFOO_DEVICES).
 
-On line 35..37, we define the permissions to set to specific files
+On line 39..41, we define the permissions to set to specific files
 installed by this package (LIBFOO_PERMISSIONS).
-
-On lines 39..41, we define a user that is used by this package (e.g.
-to run a daemon as non-root) (LIBFOO_USERS).
 
 Finally, on line 43, we call the generic-package function, which
 generates, according to the variables defined previously, all the
@@ -3829,13 +3937,16 @@ information is (assuming the package name is libfoo) :
         instead of performing another checkout.
       + cvs for retrieving source code from a CVS repository. Used by
         default when LIBFOO_SITE begins with cvs://. The downloaded
-        source code is cached as with the svn method. Only anonymous
-        pserver mode is supported. LIBFOO_SITE must contain the
-        source URL as well as the remote repository directory. The
-        module is the package name. LIBFOO_VERSION is mandatory and 
-        must be a tag, a branch, or a date (e.g. "2014-10-20",
-        "2014-10-20 13:45", "2014-10-20 13:45+01" see "man cvs" for
-        further details).
+        source code is cached as with the svn method. Anonymous
+        pserver mode is assumed otherwise explicitly defined on
+        LIBFOO_SITE. Both LIBFOO_SITE=cvs://libfoo.net:/cvsroot/
+        libfoo and LIBFOO_SITE=cvs://:ext:libfoo.net:/cvsroot/libfoo
+        are accepted, on the former anonymous pserver access mode is
+        assumed. LIBFOO_SITE must contain the source URL as well as
+        the remote repository directory. The module is the package
+        name. LIBFOO_VERSION is mandatory and must be a tag, a
+        branch, or a date (e.g. "2014-10-20", "2014-10-20 13:45",
+        "2014-10-20 13:45+01" see "man cvs" for further details).
       + git for retrieving source code from a Git repository. Used by
         default when LIBFOO_SITE begins with git://. The downloaded
         source code is cached as with the svn method.
@@ -3854,6 +3965,11 @@ information is (assuming the package name is libfoo) :
         when LIBFOO_SITE specifies a local directory path containing
         the package source code. Buildroot copies the contents of the
         source directory into the package’s build directory.
+  * LIBFOO_GIT_SUBMODULES, when LIBFOO_SITE_METHOD=git, will create
+    an archive with the git submodules in the repository. Note that
+    we try not to use such git submodules when they contain bundled
+    libraries, in which case we prefer to use those libraries from
+    their own package.
   * LIBFOO_STRIP_COMPONENTS is the number of leading components
     (directories) that tar must strip from file names on extraction.
     The tarball for most packages has one leading component named "
@@ -3923,7 +4039,18 @@ information is (assuming the package name is libfoo) :
     ambiguous names such as BSD which actually name a family of
     licenses. This variable is optional. If it is not defined,
     unknown will appear in the license field of the manifest file for
-    this package.
+    this package. The expected format for this variable must comply
+    with the following rules:
+
+      + If different parts of the package are released under
+        different licenses, then comma separate licenses (e.g.
+        LIBFOO_LICENSE = GPLv2+, LGPLv2.1+). If there is clear
+        distinction between which component is licensed under what
+        license, then annotate the license with that component,
+        between parenthesis (e.g. LIBFOO_LICENSE = GPLv2+ (programs),
+        LGPLv2.1+ (libraries)).
+      + If the package is dual licensed, then separate licenses with
+        the or keyword (e.g. LIBFOO_LICENSE = AFLv2.1 or GPLv2+).
   * LIBFOO_LICENSE_FILES is a space-separated list of files in the
     package tarball that contain the license(s) under which the
     package is released. make legal-info copies all of these files in
@@ -4013,6 +4140,11 @@ different steps of the build process.
     commands will be run only when the relevant init system is
     installed (i.e. if systemd is selected as the init system in the
     configuration, only LIBFOO_INSTALL_INIT_SYSTEMD will be run).
+  * LIBFOO_HELP_CMDS lists the actions to print the package help,
+    which is included to the main make help output. These commands
+    can print anything in any format. This is seldom used, as
+    packages rarely have custom rules. Do not use this variable,
+    unless you really know that you need to print help.
 
 The preferred way to define these variables is:
 
@@ -4482,6 +4614,82 @@ still possible to customize what is done in any particular step:
     restricted to very specific cases. Do not use it in the general
     case.
 
+17.8.3. Generating a python-package from a PyPI repository
+
+If the Python package for which you would like to create a Buildroot
+package is available on PyPI, you may want to use the scanpypi tool
+located in support/scripts to automate the process.
+
+You can find the list of existing PyPI packages here [https://
+pypi.python.org].
+
+scanpypi requires Python’s setuptools package to be installed on your
+host.
+
+When at the root of your buildroot directory just do :
+
+./support/script/scanpypi foo bar -o package
+
+This will generate packages python-foo and python-bar in the package
+folder if they exist on https://pypi.python.org.
+
+Find the external python modules menu and insert your package inside.
+Keep in mind that the items inside a menu should be in alphabetical
+order.
+
+Please keep in mind that you’ll most likely have to manually check
+the package for any mistakes as there are things that cannot be
+guessed by the generator (e.g. dependencies on any of the python core
+modules such as BR2_PACKAGE_PYTHON_ZLIB). Also, please take note that
+the license and license files are guessed and must be checked. You
+also need to manually add the package to the package/Config.in file.
+
+If your Buildroot package is not in the official Buildroot tree but
+in a BR2_EXTERNAL tree, use the -o flag as follows:
+
+./support/script/scanpypi foo bar -o other_package_dir
+
+This will generate packages python-foo and python-bar in the
+other_package_directory instead of package.
+
+Option -h will list the available options:
+
+./support/script/scanpypi -h
+
+17.8.4. python-package CFFI backend
+
+C Foreign Function Interface for Python (CFFI) provides a convenient
+and reliable way to call compiled C code from Python using interface
+declarations written in C. Python packages relying on this backend
+can be identified by the appearance of a cffi dependency in the
+install_requires field of their setup.py file.
+
+Such a package should:
+
+  * add python-cffi as a runtime dependency in order to install the
+    compiled C library wrapper on the target. This is achieved by
+    adding select BR2_PACKAGE_PYTHON_CFFI to the package Config.in.
+
+config BR2_PACKAGE_PYTHON_FOO
+        bool "python-foo"
+        select BR2_PACKAGE_PYTHON_CFFI # runtime
+
+  * add host-python-cffi as a build-time dependency in order to
+    cross-compile the C wrapper. This is achieved by adding
+    host-python-cffi to the PYTHON_FOO_DEPENDENCIES variable.
+
+################################################################################
+#
+# python-foo
+#
+################################################################################
+
+...
+
+PYTHON_FOO_DEPENDENCIES = host-python-cffi
+
+$(eval $(python-package))
+
 17.9. Infrastructure for LuaRocks-based packages
 
 17.9.1. luarocks-package tutorial
@@ -4850,6 +5058,15 @@ This snippet creates the following make targets:
 
 and ensures that the source configuration file is copied to the build
 directory at the right moment.
+
+There are two options to specify a configuration file to use, either
+FOO_KCONFIG_FILE (as in the example, above) or FOO_KCONFIG_DEFCONFIG.
+It is mandatory to provide either, but not both:
+
+  * FOO_KCONFIG_FILE specifies the path to a defconfig or full-config
+    file to be used to configure the package.
+  * FOO_KCONFIG_DEFCONFIG specifies the defconfig make rule to call
+    to configure the package.
 
 In addition to these minimally required lines, several optional
 variables can be set to suit the needs of the package under
@@ -5409,6 +5626,13 @@ among others, use the following variables:
   * $(SRCDIR): the path to the overridden source directory
   * $(@D): the path to the build directory
 
+17.17.2. Target-finalize hook
+
+Packages may also register hooks in LIBFOO_TARGET_FINALIZE_HOOKS.
+These hooks are run after all packages are built, but before the
+filesystem images are generated. They are seldom used, and your
+package probably do not need them.
+
 17.18. Gettext integration and interaction with packages
 
 Many packages that support internationalization use the gettext
@@ -5608,12 +5832,11 @@ patches” for details.
 
       + If a series file exists in the package directory, then
         patches are applied according to the series file;
-      + Otherwise, patch files matching <packagename>-*.patch are
-        applied in alphabetical order. So, to ensure they are applied
-        in the right order, it is highly recommended to name the
-        patch files like this: <packagename>-<number>-
-        <description>.patch, where <number> refers to the apply order
-        .
+      + Otherwise, patch files matching *.patch are applied in
+        alphabetical order. So, to ensure they are applied in the
+        right order, it is highly recommended to name the patch files
+        like this: <number>-<description>.patch, where <number>
+        refers to the apply order.
  5. If BR2_GLOBAL_PATCH_DIR is defined, the directories will be
     enumerated in the order they are specified. The patches are
     applied as described in the previous step.
@@ -5623,8 +5846,8 @@ If something goes wrong in the steps 3 or 4, then the build fails.
 
 18.3. Format and licensing of the package patches
 
-Patches are released under the same license as the software that is
-modified.
+Patches are released under the same license as the software they
+apply to (see Section 12.3, “Complying with the Buildroot license”).
 
 A message explaining what the patch does, and why it is needed,
 should be added in the header commentary of the patch.
@@ -5639,6 +5862,11 @@ the upstream SCM software to generate the patch set.
 
 Otherwise, concatenate the header with the output of the diff -purN
 package-version.orig/ package-version/ command.
+
+If you update an existing patch (e.g. when bumping the package
+version), make sure the existing From header and Signed-off-by tags
+are not removed, but do update the rest of the patch comment when
+appropriate.
 
 At the end, the patch should look like:
 
@@ -5907,6 +6135,83 @@ instead.
 
 If you made some changes to Buildroot and you would like to
 contribute them to the Buildroot project, proceed as follows.
+
+21.5.1. The formatting of a patch
+
+We expect patches to be formatted in a specific way. This is
+necessary to make it easy to review patches, to be able to apply them
+easily to the git repository, to make it easy to find back in the
+history how and why things have changed, and to make it possible to
+use git bisect to locate the origin of a problem.
+
+First of all, it is essential that the patch has a good commit
+message. The commit message should start with a separate line with a
+brief summary of the change, starting with the name of the affected
+package. The body of the commit message should describe why this
+change is needed, and if necessary also give details about how it was
+done. When writing the commit message, think of how the reviewers
+will read it, but also think about how you will read it when you look
+at this change again a few years down the line.
+
+Second, the patch itself should do only one change, but do it
+completely. Two unrelated or weakly related changes should usually be
+done in two separate patches. This usually means that a patch affects
+only a single package. If several changes are related, it is often
+still possible to split them up in small patches and apply them in a
+specific order. Small patches make it easier to review, and often
+make it easier to understand afterwards why a change was done.
+However, each patch must be complete. It is not allowed that the
+build is broken when only the first but not the second patch is
+applied. This is necessary to be able to use git bisect afterwards.
+
+Of course, while you’re doing your development, you’re probably going
+back and forth between packages, and certainly not committing things
+immediately in a way that is clean enough for submission. So most
+developers rewrite the history of commits to produce a clean set of
+commits that is appropriate for submission. To do this, you need to
+use interactive rebasing. You can learn about it in the Pro Git book
+[https://git-scm.com/book/en/v2/Git-Tools-Rewriting-History].
+Sometimes, it is even easier to discard you history with git reset
+--soft origin/master and select individual changes with git add -i or
+git add -p.
+
+Finally, the patch should be signed off. This is done by adding
+Signed-off-by: Your Real Name <> at the end of the commit message.
+git commit -s does that for you, if configured properly. The
+Signed-off-by tag means that you publish the patch under the
+Buildroot license (i.e. GPLv2, except for package patches, which have
+the upstream license), and that you are allowed to do so. See the
+Developer Certificate of Origin [http://developercertificate.org/]
+for details.
+
+When adding new packages, you should submit every package in a
+separate patch. This patch should have the update to package/
+Config.in, the package Config.in file, the .mk file, the .hash file,
+any init script, and all package patches. If the package has many
+sub-options, these are sometimes better added as separate follow-up
+patches. The summary line should be something like <packagename>: new
+package. The body of the commit message can be empty for simple
+packages, or it can contain the description of the package (like the
+Config.in help text). If anything special has to be done to build the
+package, this should also be explained explicitly in the commit
+message body.
+
+When you bump a package to a new version, you should also submit a
+separate patch for each package. Don’t forget to update the .hash
+file, or add it if it doesn’t exist yet. Also don’t forget to check
+if the _LICENSE and _LICENSE_FILES are still valid. The summary line
+should be something like <packagename>: bump to version <new
+version>. If the new version only contains security updates compared
+to the existing one, the summary should be <packagename>: security
+bump to version <new version> and the commit message body should show
+the CVE numbers that are fixed. If some package patches can be
+removed in the new version, it should be explained explicitly why
+they can be removed, preferably with the upstream commit ID. Also any
+other required changes should be explained explicitly, like configure
+options that no longer exist or are no longer needed.
+
+21.5.2. Preparing a patch series
+
 Starting from the changes committed in your local git view, rebase
 your development branch on top of the upstream tree before generating
 a patch set. To do so, run:
@@ -5938,7 +6243,7 @@ line-wrapped, otherwise they cannot easily be applied. In such a
 case, fix your e-mail client, or better yet, learn to use git
 send-email.
 
-21.5.1. Cover letter
+21.5.3. Cover letter
 
 If you want to present the whole patch set in a separate mail, add
 --cover-letter to the git format-patch command (see man
@@ -5954,7 +6259,7 @@ the following cases:
   * whenever you feel it will help presenting your work, your
     choices, the review process, etc.
 
-21.5.2. Patch revision changelog
+21.5.4. Patch revision changelog
 
 When improvements are requested, the new revision of each commit
 should include a changelog of the modifications between each
@@ -6106,8 +6411,10 @@ There are a few non-trivial blocks:
       + c: a character device file
       + b: a block device file
       + p: a named pipe
-  * mode, uid and gid are the usual permissions settings (only
-    numerical values are allowed)
+  * mode are the usual permissions settings (only numerical values
+    are allowed)
+  * uid and gid are the UID and GID to set on this file; can be
+    either numerical values or actual names
   * major and minor are here for device files, set to - for other
     files
   * start, inc and count are for when you want to create a batch of
@@ -6115,27 +6422,56 @@ There are a few non-trivial blocks:
     incrementing its counter by inc until it reaches count
 
 Let’s say you want to change the permissions of a given file; using
-this syntax, you will need to put:
+this syntax, you will need to write:
 
-/usr/bin/foobar f 644 0 0 - - - - -
+/usr/bin/foo f 755 0 0 - - - - -
+/usr/bin/bar f 755 root root - - - - -
+/data/buz f 644 buz-user buz-group - - - - -
 
 Alternatively, if you want to change owner/permission of a directory
-recursively, you can put (to set UID to 123, GID to 456 and access
+recursively, you can write (to set UID to foo, GID to bar and access
 rights to rwxr-x--- for the directory /usr/share/myapp and all files
 and directories below it):
 
-/usr/share/myapp r 750 123 456 - - - - -
+/usr/share/myapp r 750 foo bar - - - - -
 
 On the other hand, if you want to create the device file /dev/hda and
 the corresponding 15 files for the partitions, you will need for /dev
 /hda:
 
-/dev/hda b 640 0 0 3 0 0 0 -
+/dev/hda b 640 root root 3 0 0 0 -
 
 and then for device files corresponding to the partitions of /dev/
 hda, /dev/hdaX, X ranging from 1 to 15:
 
-/dev/hda b 640 0 0 3 1 1 1 15
+/dev/hda b 640 root root 3 1 1 1 15
+
+Extended attributes are supported if
+BR2_ROOTFS_DEVICE_TABLE_SUPPORTS_EXTENDED_ATTRIBUTES is enabled. This
+is done by adding a line starting with |xattr after the line
+describing the file. Right now, only capability is supported as
+extended attribute.
+
++------------------+
+||xattr|capability |
++------------------+
+
+  * |xattr is a "flag" that indicate an extended attribute
+  * capability is a capability to add to the previous file
+
+If you want to add the capability cap_sys_admin to the binary foo,
+you will write :
+
+/usr/bin/foo f 755 root root - - - - -
+|xattr cap_sys_admin+eip
+
+You can add several capabilities to a file by using several |xattr
+lines. If you want to add the capability cap_sys_admin and
+cap_net_admin to the binary foo, you will write :
+
+/usr/bin/foo f 755 root root - - - - -
+|xattr cap_sys_admin+eip
+|xattr cap_net_admin+eip
 
 Chapter 23. Makeusers syntax documentation
 
@@ -6227,13 +6563,25 @@ Chapter 24. List of target packages available in Buildroot
 +-------------------------------------------------------------------+
 |           Packages            |Target packages → …                |
 |-------------------------------+-----------------------------------|
+|              4th              |→ Interpreter languages and        |
+|                               |scripting                          |
+|-------------------------------+-----------------------------------|
 |            a10disp            |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |              acl              |→ System tools                     |
 |-------------------------------+-----------------------------------|
+|            acpica             |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
 |             acpid             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
-|      adwaita icon theme       |→ Fonts, icons, sounds and themes  |
+|           acpitool            |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|            acsccid            |→ Libraries → Hardware handling    |
+|-------------------------------+-----------------------------------|
+|      adwaita icon theme       |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
+|-------------------------------+-----------------------------------|
+|          aer-inject           |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |            aespipe            |→ Miscellaneous                    |
 |-------------------------------+-----------------------------------|
@@ -6242,6 +6590,14 @@ Chapter 24. List of target packages available in Buildroot
 |             aiccu             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |          aircrack-ng          |→ Networking applications          |
+|-------------------------------+-----------------------------------|
+|            alljoyn            |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|         alljoyn-base          |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|          alljoyn-tcl          |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|       alljoyn-tcl-base        |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
 |           alsa-lib            |→ Libraries → Audio/Sound          |
 |-------------------------------+-----------------------------------|
@@ -6253,6 +6609,8 @@ Chapter 24. List of target packages available in Buildroot
 |      am335x-pru-package       |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |           am33x-cm3           |→ Hardware handling → Firmware     |
+|-------------------------------+-----------------------------------|
+|         android-tools         |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |           angularjs           |→ Libraries → Javascript           |
 |-------------------------------+-----------------------------------|
@@ -6275,11 +6633,16 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |        argp-standalone        |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
+|           argparse            |→ Interpreter languages and        |
+|                               |scripting → Lua libraries/modules  |
+|-------------------------------+-----------------------------------|
 |             argus             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |           armadillo           |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
 |           arptables           |→ Networking applications          |
+|-------------------------------+-----------------------------------|
+|            assimp             |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |              at               |→ Shell and utilities              |
 |-------------------------------+-----------------------------------|
@@ -6289,6 +6652,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |              atk              |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
+|             atkmm             |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
 |             attr              |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |           audiofile           |→ Libraries → Audio/Sound          |
@@ -6296,6 +6661,8 @@ Chapter 24. List of target packages available in Buildroot
 |             audit             |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |             aumix             |→ Audio and video applications     |
+|-------------------------------+-----------------------------------|
+|            autofs             |→ Filesystem and flash utilities   |
 |-------------------------------+-----------------------------------|
 |            autossh            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -6307,15 +6674,21 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |         b43-firmware          |→ Hardware handling → Firmware     |
 |-------------------------------+-----------------------------------|
+|            babeld             |→ Networking applications          |
+|-------------------------------+-----------------------------------|
 |          bandwidthd           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |             bash              |→ Shell and utilities              |
 |-------------------------------+-----------------------------------|
 |            batctl             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|          batman-adv           |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
 |              bc               |→ Miscellaneous                    |
 |-------------------------------+-----------------------------------|
 |         bcache tools          |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|            bcm2835            |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
 |            bcusdk             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -6353,7 +6726,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           bitstream           |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
-|        Bitstream Vera         |→ Fonts, icons, sounds and themes  |
+|        Bitstream Vera         |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
 |           blktrace            |→ Debugging, profiling and         |
 |                               |benchmark                          |
@@ -6408,9 +6782,16 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |             cairo             |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
+|            cairomm            |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
 |           can-utils           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |          canfestival          |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|          cannelloni           |→ Networking applications          |
+|-------------------------------+-----------------------------------|
+|           cantarell           |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
 |         cblas/clapack         |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
@@ -6432,11 +6813,17 @@ Chapter 24. List of target packages available in Buildroot
 |            cgilua             |→ Interpreter languages and        |
 |                               |scripting → Lua libraries/modules  |
 |-------------------------------+-----------------------------------|
+|        cgroupfs-mount         |→ System tools                     |
+|-------------------------------+-----------------------------------|
 |             check             |→ Development tools                |
+|-------------------------------+-----------------------------------|
+|        chocolate-doom         |→ Games                            |
 |-------------------------------+-----------------------------------|
 |            chrony             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |          cifs-utils           |→ Filesystem and flash utilities   |
+|-------------------------------+-----------------------------------|
+|            circus             |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |           civetweb            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -6448,11 +6835,16 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           collectd            |→ Miscellaneous                    |
 |-------------------------------+-----------------------------------|
+|         comix-cursors         |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
+|-------------------------------+-----------------------------------|
 |        compositeproto         |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |X protocols                        |
 |-------------------------------+-----------------------------------|
 |            connman            |→ Networking applications          |
+|-------------------------------+-----------------------------------|
+|          connman-gtk          |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |        conntrack-tools        |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -6483,6 +6875,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |             crda              |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|            crudini            |→ Shell and utilities              |
+|-------------------------------+-----------------------------------|
 |        cryptodev-linux        |→ Libraries → Crypto → cryptodev   |
 |                               |variant                            |
 |-------------------------------+-----------------------------------|
@@ -6490,13 +6884,15 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           ctorrent            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
-|       cups (deprecated)       |→ Networking applications          |
+|             cups              |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |       curlftpfs (FUSE)        |→ Filesystem and flash utilities   |
 |-------------------------------+-----------------------------------|
 |              cvs              |→ Development tools                |
 |-------------------------------+-----------------------------------|
 |             cwiid             |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|            cxxtest            |→ Development tools                |
 |-------------------------------+-----------------------------------|
 |             czmq              |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
@@ -6506,6 +6902,8 @@ Chapter 24. List of target packages available in Buildroot
 |          damageproto          |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |X protocols                        |
+|-------------------------------+-----------------------------------|
+|             dante             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |             dash              |→ Shell and utilities              |
 |-------------------------------+-----------------------------------|
@@ -6528,7 +6926,8 @@ Chapter 24. List of target packages available in Buildroot
 |      Declarative module       |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
-|         DejaVu fonts          |→ Fonts, icons, sounds and themes  |
+|         DejaVu fonts          |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
 |            devmem2            |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
@@ -6572,6 +6971,12 @@ Chapter 24. List of target packages available in Buildroot
 |            docker             |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
+|       docker-containerd       |→ System tools                     |
+|-------------------------------+-----------------------------------|
+|         docker-engine         |→ System tools                     |
+|-------------------------------+-----------------------------------|
+|           domoticz            |→ Miscellaneous                    |
+|-------------------------------+-----------------------------------|
 |           dos2unix            |→ Development tools                |
 |-------------------------------+-----------------------------------|
 |          dosfstools           |→ Filesystem and flash utilities   |
@@ -6598,6 +7003,9 @@ Chapter 24. List of target packages available in Buildroot
 |           dsp-tools           |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |             dstat             |→ Debugging, profiling and         |
+|                               |benchmark                          |
+|-------------------------------+-----------------------------------|
+|              dt               |→ Debugging, profiling and         |
 |                               |benchmark                          |
 |-------------------------------+-----------------------------------|
 |             dtach             |→ Shell and utilities              |
@@ -6629,17 +7037,31 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |              ed               |→ Text editors and viewers         |
 |-------------------------------+-----------------------------------|
+|          edid-decode          |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
 |            editres            |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |Applications                       |
 |-------------------------------+-----------------------------------|
 |            eeprog             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
+|          efibootmgr           |→ System tools                     |
+|-------------------------------+-----------------------------------|
+|            efivar             |→ System tools                     |
+|-------------------------------+-----------------------------------|
+|              efl              |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
 |             eigen             |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
 |           ejabberd            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|          elementary           |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
 |           elfutils            |→ Libraries → Other                |
+|-------------------------------+-----------------------------------|
+|             emlog             |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |             empty             |→ Miscellaneous                    |
 |-------------------------------+-----------------------------------|
@@ -6653,15 +7075,8 @@ Chapter 24. List of target packages available in Buildroot
 |         enlightenment         |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
-|   Enlightenment Foundation    |→ Graphic libraries and            |
-|           Libraries           |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
 |           enscript            |→ Interpreter languages and        |
 |                               |scripting                          |
-|-------------------------------+-----------------------------------|
-|             epoxy             |→ Graphic libraries and            |
-|                               |applications (graphic/text) → X11R7|
-|                               |Libraries                          |
 |-------------------------------+-----------------------------------|
 |            erlang             |→ Interpreter languages and        |
 |                               |scripting                          |
@@ -6789,6 +7204,9 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |             fftw              |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
+|             ficl              |→ Interpreter languages and        |
+|                               |scripting                          |
+|-------------------------------+-----------------------------------|
 |             file              |→ Shell and utilities              |
 |-------------------------------+-----------------------------------|
 |            filemq             |→ Libraries → Networking           |
@@ -6809,6 +7227,8 @@ Chapter 24. List of target packages available in Buildroot
 |             flac              |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
 |             flann             |→ Libraries → Other                |
+|-------------------------------+-----------------------------------|
+|            flannel            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |          flashbench           |→ Filesystem and flash utilities   |
 |-------------------------------+-----------------------------------|
@@ -6860,6 +7280,9 @@ Chapter 24. List of target packages available in Buildroot
 |       font-arabic-misc        |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |Fonts                              |
+|-------------------------------+-----------------------------------|
+|         font-awesome          |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
 |        font-bh-100dpi         |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
@@ -6991,8 +7414,6 @@ Chapter 24. List of target packages available in Buildroot
 |                               |applications (graphic/text) → X11R7|
 |                               |Applications                       |
 |-------------------------------+-----------------------------------|
-| foomatic_filters (deprecated) |→ Networking applications          |
-|-------------------------------+-----------------------------------|
 |             fping             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |       freeradius-client       |→ Libraries → Networking           |
@@ -7001,6 +7422,8 @@ Chapter 24. List of target packages available in Buildroot
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |   Freescale i.MX libraries    |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|          freeswitch           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |           freetype            |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
@@ -7017,6 +7440,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |             ftop              |→ System tools                     |
 |-------------------------------+-----------------------------------|
+|             fwup              |→ Filesystem and flash utilities   |
+|-------------------------------+-----------------------------------|
 |            fxload             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |         gadgetfs-test         |→ Hardware handling                |
@@ -7027,6 +7452,8 @@ Chapter 24. List of target packages available in Buildroot
 |                               |scripting                          |
 |-------------------------------+-----------------------------------|
 |             gawk              |→ Development tools                |
+|-------------------------------+-----------------------------------|
+|              gcr              |→ Libraries → Crypto               |
 |-------------------------------+-----------------------------------|
 |              gd               |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
@@ -7053,7 +7480,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            gflags             |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
-|       ghostscript-fonts       |→ Fonts, icons, sounds and themes  |
+|       ghostscript-fonts       |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
 |            giblib             |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
@@ -7083,6 +7511,8 @@ Chapter 24. List of target packages available in Buildroot
 |             gmpc              |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
+|      gmrender-resurrect       |→ Audio and video applications     |
+|-------------------------------+-----------------------------------|
 |            gnu-efi            |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
 |           gnuchess            |→ Games                            |
@@ -7103,7 +7533,8 @@ Chapter 24. List of target packages available in Buildroot
 |        google-breakpad        |→ Debugging, profiling and         |
 |                               |benchmark                          |
 |-------------------------------+-----------------------------------|
-| google-material-design-icons  |→ Fonts, icons, sounds and themes  |
+| google-material-design-icons  |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
 |             gperf             |→ Development tools                |
 |-------------------------------+-----------------------------------|
@@ -7118,12 +7549,18 @@ Chapter 24. List of target packages available in Buildroot
 |            gqview             |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
+|          gr-osmosdr           |→ Miscellaneous                    |
+|-------------------------------+-----------------------------------|
+|            granite            |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
 |           grantlee            |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |           graphite2           |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |             grep              |→ Development tools                |
+|-------------------------------+-----------------------------------|
+|   gsettings-desktop-schemas   |→ Miscellaneous                    |
 |-------------------------------+-----------------------------------|
 |              gsl              |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
@@ -7169,13 +7606,18 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |             gtest             |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
-|          gtk engines          |→ Fonts, icons, sounds and themes  |
+|          gtk engines          |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
 |            gtk# 3             |→ Interpreter languages and        |
 |                               |scripting → Mono libraries/modules |
 |-------------------------------+-----------------------------------|
+|            gtkmm3             |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
 | gtkperf (performance test for |→ Graphic libraries and            |
 |             GTK2)             |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
+|         gtksourceview         |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |             guile             |→ Interpreter languages and        |
 |                               |scripting                          |
@@ -7184,7 +7626,11 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           gupnp-av            |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
-|    gutenprint (deprecated)    |→ Networking applications          |
+|          gupnp-dlna           |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|          gupnp-tools          |→ Networking applications          |
+|-------------------------------+-----------------------------------|
+|          gutenprint           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |             gvfs              |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
@@ -7205,11 +7651,14 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           hiawatha            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
-|      hicolor icon theme       |→ Fonts, icons, sounds and themes  |
+|      hicolor icon theme       |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
+|-------------------------------+-----------------------------------|
+|            hidapi             |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
 |            hostapd            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
-|      hplip (deprecated)       |→ Networking applications          |
+|             hplip             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |             htop              |→ System tools                     |
 |-------------------------------+-----------------------------------|
@@ -7220,6 +7669,8 @@ Chapter 24. List of target packages available in Buildroot
 |             hwloc             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |           i2c-tools           |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|              i7z              |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |           ibrcommon           |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
@@ -7246,6 +7697,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           ifupdown            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|        igd2-for-linux         |→ Networking applications          |
+|-------------------------------+-----------------------------------|
 |         igh-ethercat          |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |           igmpproxy           |→ Networking applications          |
@@ -7257,19 +7710,26 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            imlib2             |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
+|           imx-codec           |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
 |          imx-gpu-viv          |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |           imx-kobs            |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |            imx-lib            |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
+|          imx-parser           |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|            imx-uuc            |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
 |            imx-vpu            |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|          imx-vpuwrap          |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |            inadyn             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
-|          inconsolata          |→ Fonts, icons, sounds and themes  |
-|-------------------------------+-----------------------------------|
-|            infozip            |→ Compressors and decompressors    |
+|          inconsolata          |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
 |         inotify-tools         |→ Shell and utilities              |
 |-------------------------------+-----------------------------------|
@@ -7298,7 +7758,7 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            iperf3             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
-|             ipkg              |→ Package managers                 |
+|       ipkg (deprecated)       |→ Package managers                 |
 |-------------------------------+-----------------------------------|
 |           ipmitool            |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
@@ -7341,6 +7801,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            jasper             |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
+|           jemalloc            |→ Libraries → Other                |
+|-------------------------------+-----------------------------------|
 |             jhead             |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
@@ -7359,19 +7821,29 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            jQuery             |→ Libraries → Javascript           |
 |-------------------------------+-----------------------------------|
-|        jQuery keyboard        |→ Libraries → Javascript           |
+|     jquery-datetimepicker     |→ Libraries → Javascript → External|
+|                               |jQuery plugins                     |
 |-------------------------------+-----------------------------------|
-|           jQuery UI           |→ Libraries → Javascript           |
+|        jquery-keyboard        |→ Libraries → Javascript → External|
+|                               |jQuery plugins                     |
 |-------------------------------+-----------------------------------|
-|       jQuery UI themes        |→ Libraries → Javascript           |
+|         jquery-mobile         |→ Libraries → Javascript → External|
+|                               |jQuery plugins                     |
 |-------------------------------+-----------------------------------|
-|     jquery-datetimepicker     |→ Libraries → Javascript           |
+|        jquery-sidebar         |→ Libraries → Javascript → External|
+|                               |jQuery plugins                     |
 |-------------------------------+-----------------------------------|
-|         jquery-mobile         |→ Libraries → Javascript           |
+|       jquery-sparkline        |→ Libraries → Javascript → External|
+|                               |jQuery plugins                     |
 |-------------------------------+-----------------------------------|
-|       jQuery-Sparkline        |→ Libraries → Javascript           |
+|           jquery-ui           |→ Libraries → Javascript → External|
+|                               |jQuery plugins                     |
 |-------------------------------+-----------------------------------|
-|       jQuery-Validation       |→ Libraries → Javascript           |
+|       jquery-ui-themes        |→ Libraries → Javascript → External|
+|                               |jQuery plugins                     |
+|-------------------------------+-----------------------------------|
+|       jquery-validation       |→ Libraries → Javascript → External|
+|                               |jQuery plugins                     |
 |-------------------------------+-----------------------------------|
 |             jsmin             |→ Libraries → Javascript           |
 |-------------------------------+-----------------------------------|
@@ -7389,6 +7861,8 @@ Chapter 24. List of target packages available in Buildroot
 |                               |applications (graphic/text) → X11R7|
 |                               |X protocols                        |
 |-------------------------------+-----------------------------------|
+|   kernel-module-imx-gpu-viv   |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
 |             kexec             |→ Debugging, profiling and         |
 |                               |benchmark                          |
 |-------------------------------+-----------------------------------|
@@ -7401,17 +7875,28 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |             kmod              |→ System tools                     |
 |-------------------------------+-----------------------------------|
+|             kms++             |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
 |             knock             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |             kodi              |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
-|        kodi-addon-xvdr        |→ Audio and video applications →   |
+| kodi-addon-xvdr (deprecated)  |→ Audio and video applications →   |
 |                               |PVR addons                         |
+|-------------------------------+-----------------------------------|
+|        kodi-adsp-basic        |→ Audio and video applications →   |
+|                               |Audio DSP addons                   |
+|-------------------------------+-----------------------------------|
+|    kodi-adsp-freesurround     |→ Audio and video applications →   |
+|                               |Audio DSP addons                   |
 |-------------------------------+-----------------------------------|
 |   kodi-audiodecoder-modplug   |→ Audio and video applications →   |
 |                               |Audio decoder addons               |
 |-------------------------------+-----------------------------------|
 |  kodi-audiodecoder-nosefart   |→ Audio and video applications →   |
+|                               |Audio decoder addons               |
+|-------------------------------+-----------------------------------|
+|    kodi-audiodecoder-opus     |→ Audio and video applications →   |
 |                               |Audio decoder addons               |
 |-------------------------------+-----------------------------------|
 |   kodi-audiodecoder-sidplay   |→ Audio and video applications →   |
@@ -7453,6 +7938,9 @@ Chapter 24. List of target packages available in Buildroot
 |        kodi-pvr-filmon        |→ Audio and video applications →   |
 |                               |PVR addons                         |
 |-------------------------------+-----------------------------------|
+|      kodi-pvr-hdhomerun       |→ Audio and video applications →   |
+|                               |PVR addons                         |
+|-------------------------------+-----------------------------------|
 |         kodi-pvr-hts          |→ Audio and video applications →   |
 |                               |PVR addons                         |
 |-------------------------------+-----------------------------------|
@@ -7492,7 +7980,13 @@ Chapter 24. List of target packages available in Buildroot
 |  kodi-screensaver-asteroids   |→ Audio and video applications →   |
 |                               |Screensavers                       |
 |-------------------------------+-----------------------------------|
+|  kodi-screensaver-asterwave   |→ Audio and video applications →   |
+|                               |Screensavers                       |
+|-------------------------------+-----------------------------------|
 |  kodi-screensaver-biogenesis  |→ Audio and video applications →   |
+|                               |Screensavers                       |
+|-------------------------------+-----------------------------------|
+|   kodi-screensaver-cpblobs    |→ Audio and video applications →   |
 |                               |Screensavers                       |
 |-------------------------------+-----------------------------------|
 | kodi-screensaver-crystalmorph |→ Audio and video applications →   |
@@ -7501,14 +7995,32 @@ Chapter 24. List of target packages available in Buildroot
 |  kodi-screensaver-greynetic   |→ Audio and video applications →   |
 |                               |Screensavers                       |
 |-------------------------------+-----------------------------------|
+| kodi-screensaver-matrixtrails |→ Audio and video applications →   |
+|                               |Screensavers                       |
+|-------------------------------+-----------------------------------|
 |   kodi-screensaver-pingpong   |→ Audio and video applications →   |
+|                               |Screensavers                       |
+|-------------------------------+-----------------------------------|
+|  kodi-screensaver-planestate  |→ Audio and video applications →   |
 |                               |Screensavers                       |
 |-------------------------------+-----------------------------------|
 |     kodi-screensaver-pyro     |→ Audio and video applications →   |
 |                               |Screensavers                       |
 |-------------------------------+-----------------------------------|
+|     kodi-screensaver-rsxs     |→ Audio and video applications →   |
+|                               |Screensavers                       |
+|-------------------------------+-----------------------------------|
 |    kodi-screensaver-stars     |→ Audio and video applications →   |
 |                               |Screensavers                       |
+|-------------------------------+-----------------------------------|
+|  kodi-visualisation-fishbmc   |→ Audio and video applications →   |
+|                               |Visualisations                     |
+|-------------------------------+-----------------------------------|
+|  kodi-visualisation-fountain  |→ Audio and video applications →   |
+|                               |Visualisations                     |
+|-------------------------------+-----------------------------------|
+|    kodi-visualisation-goom    |→ Audio and video applications →   |
+|                               |Visualisations                     |
 |-------------------------------+-----------------------------------|
 | kodi-visualisation-shadertoy  |→ Audio and video applications →   |
 |                               |Visualisations                     |
@@ -7533,6 +8045,8 @@ Chapter 24. List of target packages available in Buildroot
 |                               |benchmark                          |
 |-------------------------------+-----------------------------------|
 |             lame              |→ Audio and video applications     |
+|-------------------------------+-----------------------------------|
+|          lapack/blas          |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
 |          latencytop           |→ Debugging, profiling and         |
 |                               |benchmark                          |
@@ -7559,9 +8073,15 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            leveldb            |→ Libraries → Database             |
 |-------------------------------+-----------------------------------|
+|              lft              |→ Networking applications          |
+|-------------------------------+-----------------------------------|
 |             lftp              |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|            libaacs            |→ Libraries → Multimedia           |
+|-------------------------------+-----------------------------------|
 |            libaio             |→ Libraries → Hardware handling    |
+|-------------------------------+-----------------------------------|
+|          libamcodec           |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
 |             libao             |→ Libraries → Audio/Sound          |
 |-------------------------------+-----------------------------------|
@@ -7572,6 +8092,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            libart             |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
+|           libasplib           |→ Libraries → Audio/Sound          |
+|-------------------------------+-----------------------------------|
 |            libass             |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
 |           libassuan           |→ Libraries → Crypto               |
@@ -7579,6 +8101,8 @@ Chapter 24. List of target packages available in Buildroot
 |          libatasmart          |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
 |         libatomic_ops         |→ Libraries → Other                |
+|-------------------------------+-----------------------------------|
+|           libbdplus           |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
 |           libbluray           |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
@@ -7607,6 +8131,8 @@ Chapter 24. List of target packages available in Buildroot
 |            libcli             |→ Libraries → Text and terminal    |
 |                               |handling                           |
 |-------------------------------+-----------------------------------|
+|            libcoap            |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
 |           libcodec2           |→ Libraries → Audio/Sound          |
 |-------------------------------+-----------------------------------|
 |            libcofi            |→ Libraries → Other                |
@@ -7614,6 +8140,8 @@ Chapter 24. List of target packages available in Buildroot
 |           libconfig           |→ Libraries → Filesystem           |
 |-------------------------------+-----------------------------------|
 |          libconfuse           |→ Libraries → Filesystem           |
+|-------------------------------+-----------------------------------|
+|           libcroco            |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
 |         libcrossguid          |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
@@ -7641,7 +8169,11 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           libdvbcsa           |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
+|           libdvbpsi           |→ Libraries → Multimedia           |
+|-------------------------------+-----------------------------------|
 |           libdvbsi            |→ Libraries → Multimedia           |
+|-------------------------------+-----------------------------------|
+|           libdvdcss           |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
 |           libdvdnav           |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
@@ -7649,58 +8181,29 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            libebml            |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
-|           libecore            |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
-|           libedbus            |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
+|          libebur128           |→ Libraries → Audio/Sound          |
 |-------------------------------+-----------------------------------|
 |            libedit            |→ Libraries → Text and terminal    |
 |                               |handling                           |
 |-------------------------------+-----------------------------------|
-|            libedje            |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
 |             libee             |→ Libraries → Other                |
-|-------------------------------+-----------------------------------|
-|            libeet             |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
-|           libefreet           |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
-|            libeina            |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
-|            libeio             |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
-|         libelementary         |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
-|           libembryo           |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |            libenca            |→ Libraries → Text and terminal    |
 |                               |handling                           |
 |-------------------------------+-----------------------------------|
-|    Liberation (Free fonts)    |→ Fonts, icons, sounds and themes  |
+|           libepoxy            |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
+|    Liberation (Free fonts)    |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
 |           libesmtp            |→ Mail                             |
 |-------------------------------+-----------------------------------|
 |            libestr            |→ Libraries → Text and terminal    |
 |                               |handling                           |
 |-------------------------------+-----------------------------------|
-|           libethumb           |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
 |             libev             |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
-|            libevas            |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
-|    libevas generic loaders    |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
+|    libevas generic loaders    |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |           libevdev            |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
@@ -7709,6 +8212,8 @@ Chapter 24. List of target packages available in Buildroot
 |            libexif            |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |          libeXosip2           |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|          libfastjson          |→ Libraries → JSON/XML             |
 |-------------------------------+-----------------------------------|
 |            libfcgi            |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
@@ -7724,6 +8229,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |          libfreefare          |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
+|          libfreeglut          |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
 |         libfreeimage          |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |          libfribidi           |→ Libraries → Text and terminal    |
@@ -7732,12 +8239,6 @@ Chapter 24. List of target packages available in Buildroot
 |             libFS             |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |Libraries                          |
-|-------------------------------+-----------------------------------|
-|          libfslcodec          |→ Libraries → Multimedia           |
-|-------------------------------+-----------------------------------|
-|         libfslparser          |→ Libraries → Multimedia           |
-|-------------------------------+-----------------------------------|
-|         libfslvpuwrap         |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
 |            libftdi            |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
@@ -7751,11 +8252,17 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           libgcrypt           |→ Libraries → Crypto               |
 |-------------------------------+-----------------------------------|
+|          libgdiplus           |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
+|            libgee             |→ Libraries → Other                |
+|-------------------------------+-----------------------------------|
 |          libgeotiff           |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |           libglade            |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |            libglew            |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
+|            libglfw            |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |           libglib2            |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
@@ -7772,6 +8279,8 @@ Chapter 24. List of target packages available in Buildroot
 |            libgtk3            |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |           libgudev            |→ Libraries → Hardware handling    |
+|-------------------------------+-----------------------------------|
+|         libhdhomerun          |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
 |            libhid             |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
@@ -7793,6 +8302,8 @@ Chapter 24. List of target packages available in Buildroot
 |            libiio             |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
 |            libilbc            |→ Libraries → Audio/Sound          |
+|-------------------------------+-----------------------------------|
+|         libimxvpuapi          |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
 |           libinput            |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
@@ -7834,6 +8345,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |         libmicrohttpd         |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
+|         libminiupnpc          |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
 |            libmms             |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
 |            libmng             |→ Libraries → Graphics             |
@@ -7850,9 +8363,13 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           libmpeg2            |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
+|           libnatpmp           |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
 |            libndp             |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
 |            libneon            |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|            libnet             |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
 |       libnetfilter_acct       |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
@@ -7904,11 +8421,15 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |          libphidget           |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
+|           libpjsip            |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
 |           libplayer           |→ Libraries → Multimedia           |
 |-------------------------------+-----------------------------------|
 |           libplist            |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
 |            libpng             |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
+|            libpqxx            |→ Libraries → Database             |
 |-------------------------------+-----------------------------------|
 |       libpthread-stubs        |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
@@ -7983,6 +8504,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           libsodium           |→ Libraries → Crypto               |
 |-------------------------------+-----------------------------------|
+|            libsoil            |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
 |         libsoundtouch         |→ Libraries → Audio/Sound          |
 |-------------------------------+-----------------------------------|
 |            libsoup            |→ Libraries → Networking           |
@@ -8014,6 +8537,10 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           libtirpc            |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
+|          libtomcrypt          |→ Libraries → Crypto               |
+|-------------------------------+-----------------------------------|
+|          libtommath           |→ Libraries → Other                |
+|-------------------------------+-----------------------------------|
 |            libtool            |→ Development tools                |
 |-------------------------------+-----------------------------------|
 |          libtorrent           |→ Libraries → Networking           |
@@ -8028,9 +8555,9 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            libuecc            |→ Libraries → Crypto               |
 |-------------------------------+-----------------------------------|
-|            libump             |→ Hardware handling                |
+|            libuio             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
-|     libungif (deprecated)     |→ Libraries → Graphics             |
+|            libump             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |         libunistring          |→ Libraries → Text and terminal    |
 |                               |handling                           |
@@ -8049,6 +8576,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |         libusb-compat         |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
+|           libusbgx            |→ Libraries → Hardware handling    |
+|-------------------------------+-----------------------------------|
 |             libuv             |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
 |            libv4l             |→ Libraries → Hardware handling    |
@@ -8056,6 +8585,8 @@ Chapter 24. List of target packages available in Buildroot
 |             libva             |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |      libva-intel-driver       |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
+|           libvdpau            |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |            libvips            |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
@@ -8243,6 +8774,10 @@ Chapter 24. List of target packages available in Buildroot
 |           ljsyscall           |→ Interpreter languages and        |
 |                               |scripting → Lua libraries/modules  |
 |-------------------------------+-----------------------------------|
+|         lksctp-tools          |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|             lldpd             |→ Networking applications          |
+|-------------------------------+-----------------------------------|
 |          lm-sensors           |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |            lmbench            |→ Debugging, profiling and         |
@@ -8253,6 +8788,8 @@ Chapter 24. List of target packages available in Buildroot
 |       lockfile programs       |→ Shell and utilities              |
 |-------------------------------+-----------------------------------|
 |           log4cplus           |→ Libraries → Logging              |
+|-------------------------------+-----------------------------------|
+|            log4cpp            |→ Libraries → Logging              |
 |-------------------------------+-----------------------------------|
 |            log4cxx            |→ Libraries → Logging              |
 |-------------------------------+-----------------------------------|
@@ -8382,6 +8919,9 @@ Chapter 24. List of target packages available in Buildroot
 |              luv              |→ Interpreter languages and        |
 |                               |scripting → Lua libraries/modules  |
 |-------------------------------+-----------------------------------|
+|             luvi              |→ Interpreter languages and        |
+|                               |scripting → Lua libraries/modules  |
+|-------------------------------+-----------------------------------|
 |     lvm2 & device mapper      |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |              lxc              |→ System tools                     |
@@ -8410,6 +8950,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           makedevs            |→ Filesystem and flash utilities   |
 |-------------------------------+-----------------------------------|
+|           mali-t76x           |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
 |           matchbox            |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
@@ -8433,6 +8975,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |   matchbox-startup-monitor    |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
+|            mbedtls            |→ Libraries → Crypto               |
 |-------------------------------+-----------------------------------|
 |              mc               |→ Text editors and viewers         |
 |-------------------------------+-----------------------------------|
@@ -8486,6 +9030,13 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           minidlna            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|           minissdpd           |→ Networking applications          |
+|-------------------------------+-----------------------------------|
+|            minizip            |→ Libraries → Compression and      |
+|                               |decompression                      |
+|-------------------------------+-----------------------------------|
+|          miraclecast          |→ Audio and video applications     |
+|-------------------------------+-----------------------------------|
 |          mjpegtools           |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
 |         mjpg-streamer         |→ Networking applications          |
@@ -8509,7 +9060,9 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |         modplugtools          |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
-|           mongoose            |→ Networking applications          |
+|            mongodb            |→ Libraries → Database             |
+|-------------------------------+-----------------------------------|
+|           mongoose            |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
 |           mongrel2            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -8540,11 +9093,17 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            mplayer            |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
+|              mpv              |→ Audio and video applications     |
+|-------------------------------+-----------------------------------|
+|             mraa              |→ Libraries → Hardware handling    |
+|-------------------------------+-----------------------------------|
 |            mrouted            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |            msgpack            |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
 |             msmtp             |→ Mail                             |
+|-------------------------------+-----------------------------------|
+|           msr-tools           |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |mtd, jffs2 and ubi/ubifs tools |→ Filesystem and flash utilities   |
 |-------------------------------+-----------------------------------|
@@ -8555,6 +9114,8 @@ Chapter 24. List of target packages available in Buildroot
 |            mtools             |→ Filesystem and flash utilities   |
 |-------------------------------+-----------------------------------|
 |              mtr              |→ Networking applications          |
+|-------------------------------+-----------------------------------|
+|           multicat            |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
 |       Multimedia Module       |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
@@ -8601,6 +9162,9 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            netplug            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|          netsniff-ng          |→ Debugging, profiling and         |
+|                               |benchmark                          |
+|-------------------------------+-----------------------------------|
 |            netsnmp            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |          netstat-nat          |→ Networking applications          |
@@ -8620,18 +9184,33 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |             nginx             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|          nginx-naxsi          |→ Networking applications →        |
+|                               |External nginx modules             |
+|-------------------------------+-----------------------------------|
+|         nginx-upload          |→ Networking applications →        |
+|                               |External nginx modules             |
+|-------------------------------+-----------------------------------|
 |            ngircd             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |             ngrep             |→ Networking applications          |
+|-------------------------------+-----------------------------------|
+|             nload             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |             nmap              |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |            nodejs             |→ Interpreter languages and        |
 |                               |scripting                          |
 |-------------------------------+-----------------------------------|
+|             nodm              |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
 |             noip              |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|             norm              |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
 |           nss-mdns            |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|         nss-pam-ldapd         |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
 |            ntfs-3g            |→ Filesystem and flash utilities   |
 |-------------------------------+-----------------------------------|
@@ -8651,6 +9230,11 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |     nvidia-tegra23 codecs     |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
+|             nvme              |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|       obsidian-cursors        |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
+|-------------------------------+-----------------------------------|
 |           ocf-linux           |→ Libraries → Crypto → cryptodev   |
 |                               |variant                            |
 |-------------------------------+-----------------------------------|
@@ -8665,6 +9249,10 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           odhcploc            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|          odroid-mali          |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|        odroid-scripts         |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
 |             ofono             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |      ola (open lighting       |→ Hardware handling                |
@@ -8674,6 +9262,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            omniorb            |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
+|           omxplayer           |→ Audio and video applications     |
+|-------------------------------+-----------------------------------|
 |         on2-8170-libs         |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
 |       on2-8170-modules        |→ Hardware handling                |
@@ -8681,6 +9271,13 @@ Chapter 24. List of target packages available in Buildroot
 |        open-plc-utils         |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |           open2300            |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|            openal             |→ Libraries → Audio/Sound          |
+|-------------------------------+-----------------------------------|
+|           openblas            |→ Libraries → Other                |
+|-------------------------------+-----------------------------------|
+|            openbox            |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |         opencore-amr          |→ Libraries → Audio/Sound          |
 |-------------------------------+-----------------------------------|
@@ -8693,6 +9290,8 @@ Chapter 24. List of target packages available in Buildroot
 |           openjpeg            |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |           openldap            |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|            openmpi            |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
 |           openntpd            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -8718,6 +9317,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            openvpn            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|           openzwave           |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
 |             opkg              |→ Package managers                 |
 |-------------------------------+-----------------------------------|
 |           oprofile            |→ Debugging, profiling and         |
@@ -8736,13 +9337,19 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |             oRTP              |→ Libraries → Networking           |
 |-------------------------------+-----------------------------------|
+|             owfs              |→ Libraries → Hardware handling    |
+|-------------------------------+-----------------------------------|
 |           owl-linux           |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |            p11-kit            |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
+|             p7zip             |→ Compressors and decompressors    |
+|-------------------------------+-----------------------------------|
 |            p910nd             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |             pango             |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
+|            pangomm            |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |            parted             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
@@ -8760,6 +9367,8 @@ Chapter 24. List of target packages available in Buildroot
 |                               |handling                           |
 |-------------------------------+-----------------------------------|
 |           pcsc-lite           |→ Libraries → Hardware handling    |
+|-------------------------------+-----------------------------------|
+|             pdbg              |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |             perl              |→ Interpreter languages and        |
 |                               |scripting                          |
@@ -8946,6 +9555,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |          postgresql           |→ Libraries → Database             |
 |-------------------------------+-----------------------------------|
+|             pound             |→ Networking applications          |
+|-------------------------------+-----------------------------------|
 |         powerpc-utils         |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |           powertop            |→ Hardware handling                |
@@ -8962,7 +9573,11 @@ Chapter 24. List of target packages available in Buildroot
 |                               |applications (graphic/text) → X11R7|
 |                               |X protocols                        |
 |-------------------------------+-----------------------------------|
+|            privoxy            |→ Networking applications          |
+|-------------------------------+-----------------------------------|
 |           procps-ng           |→ System tools                     |
+|-------------------------------+-----------------------------------|
+|        procrank_linux         |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |            proftpd            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -8987,6 +9602,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           pure-ftpd           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|             putty             |→ Networking applications          |
+|-------------------------------+-----------------------------------|
 |              pv               |→ Debugging, profiling and         |
 |                               |benchmark                          |
 |-------------------------------+-----------------------------------|
@@ -8998,10 +9615,25 @@ Chapter 24. List of target packages available in Buildroot
 |       python-alsaaudio        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|          python-argh          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-autobahn        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|     python-backports-abc      |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|     python-beautifulsoup4     |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |         python-bottle         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |          python-can           |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|          python-cbor          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |        python-certifi         |→ Interpreter languages and        |
@@ -9010,10 +9642,16 @@ Chapter 24. List of target packages available in Buildroot
 |          python-cffi          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|     python-characteristic     |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |        python-cheetah         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |        python-cherrypy        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|         python-click          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |       python-coherence        |→ Interpreter languages and        |
@@ -9028,10 +9666,31 @@ Chapter 24. List of target packages available in Buildroot
 |         python-crc16          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|        python-crossbar        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|      python-cryptography      |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|       python-cssselect        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |         python-daemon         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|      python-dataproperty      |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-dateutil        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |         python-dialog         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-dialog3         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|       python-dicttoxml        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |         python-django         |→ Interpreter languages and        |
@@ -9040,7 +9699,16 @@ Chapter 24. List of target packages available in Buildroot
 |         python-docopt         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|        python-dominate        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |          python-dpkt          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|         python-ecdsa          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-engineio        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |          python-enum          |→ Interpreter languages and        |
@@ -9052,19 +9720,43 @@ Chapter 24. List of target packages available in Buildroot
 |         python-flask          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|     python-flask-jsonrpc      |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|      python-flask-login       |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |          python-flup          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |        python-gobject         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|        python-html5lib        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |        python-httplib2        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-humanize        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |          python-id3           |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|          python-idna          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-iniparse        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|         python-iowait         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |         python-ipaddr         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|       python-ipaddress        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |          python-ipy           |→ Interpreter languages and        |
@@ -9088,6 +9780,9 @@ Chapter 24. List of target packages available in Buildroot
 |       python-libconfig        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|          python-lmdb          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |          python-lxml          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
@@ -9106,7 +9801,13 @@ Chapter 24. List of target packages available in Buildroot
 |         python-meld3          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|        python-mistune         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |        python-msgpack         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-netaddr         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |       python-netifaces        |→ Interpreter languages and        |
@@ -9121,10 +9822,31 @@ Chapter 24. List of target packages available in Buildroot
 |         python-numpy          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|       python-paho-mqtt        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |          python-pam           |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|        python-paramiko        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|       python-pathtools        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|      python-pathvalidate      |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-pexpect         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|         python-pillow         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |       python-posix-ipc        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|     python-prompt-toolkit     |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |        python-protobuf        |→ Interpreter languages and        |
@@ -9133,10 +9855,19 @@ Chapter 24. List of target packages available in Buildroot
 |         python-psutil         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|       python-ptyprocess       |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |         python-pyasn          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|     python-pyasn-modules      |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |         python-pycli          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|       python-pycparser        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |        python-pycrypto        |→ Interpreter languages and        |
@@ -9151,10 +9882,25 @@ Chapter 24. List of target packages available in Buildroot
 |         python-pygame         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|        python-pygments        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |       python-pyinotify        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|        python-pymysql         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|         python-pynacl         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|       python-pyopenssl        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |       python-pyparsing        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-pyparted        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |         python-pypcap         |→ Interpreter languages and        |
@@ -9175,6 +9921,9 @@ Chapter 24. List of target packages available in Buildroot
 |       python-pysendfile       |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|         python-pysmb          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |         python-pysnmp         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
@@ -9184,13 +9933,25 @@ Chapter 24. List of target packages available in Buildroot
 |      python-pysnmp-mibs       |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|        python-pysocks         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|     python-pytablewriter      |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|         python-pytrie         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|          python-pytz          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|         python-pyudev         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |         python-pyusb          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |          python-pyxb          |→ Interpreter languages and        |
-|                               |scripting → External python modules|
-|-------------------------------+-----------------------------------|
-|         python-pyxml          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |         python-pyyaml         |→ Interpreter languages and        |
@@ -9202,16 +9963,37 @@ Chapter 24. List of target packages available in Buildroot
 |        python-requests        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|        python-rpi-gpio        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |       python-rtslib-fb        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-scapy3k         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-sdnotify        |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |         python-serial         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|    python-service-identity    |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|      python-setproctitle      |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |       python-setuptools       |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|      python-shutilwhich       |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |       python-simplejson       |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|     python-singledispatch     |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |          python-sip           |→ Interpreter languages and        |
@@ -9220,22 +10002,55 @@ Chapter 24. List of target packages available in Buildroot
 |          python-six           |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|       python-smbus-cffi       |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-socketio        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |         python-spidev         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |         python-thrift         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|         python-tomako         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |        python-tornado         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
+|          python-treq          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
 |        python-twisted         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|         python-txaio          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|       python-u-msgpack        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|         python-ubjson         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|         python-ujson          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-urllib3         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |         python-urwid          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |      python-versiontools      |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-watchdog        |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-wcwidth         |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |         python-web2py         |→ Interpreter languages and        |
@@ -9248,6 +10063,21 @@ Chapter 24. List of target packages available in Buildroot
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |         python-ws4py          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-wsaccel         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|          python-xlrd          |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|       python-xlsxwriter       |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|        python-xlutils         |→ Interpreter languages and        |
+|                               |scripting → External python modules|
+|-------------------------------+-----------------------------------|
+|          python-xlwt          |→ Interpreter languages and        |
 |                               |scripting → External python modules|
 |-------------------------------+-----------------------------------|
 |     python-zope-interface     |→ Interpreter languages and        |
@@ -9283,7 +10113,13 @@ Chapter 24. List of target packages available in Buildroot
 |              Qt5              |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
+|             qt53d             |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
 |            qt5base            |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
+|          qt5canvas3d          |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |           qt5cinex            |→ Graphic libraries and            |
@@ -9304,13 +10140,16 @@ Chapter 24. List of target packages available in Buildroot
 |        qt5imageformats        |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
+|          qt5location          |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
 |         qt5multimedia         |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
-|           qt5quick1           |→ Graphic libraries and            |
+|       qt5quickcontrols        |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
-|       qt5quickcontrols        |→ Graphic libraries and            |
+|       qt5quickcontrols2       |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |           qt5script           |→ Graphic libraries and            |
@@ -9319,19 +10158,22 @@ Chapter 24. List of target packages available in Buildroot
 |          qt5sensors           |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
+|         qt5serialbus          |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
 |         qt5serialport         |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |            qt5svg             |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
+|           qt5tools            |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
 |         qt5webchannel         |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |           qt5webkit           |→ Graphic libraries and            |
-|                               |applications (graphic/text)        |
-|-------------------------------+-----------------------------------|
-|      qt5webkit examples       |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |         qt5websockets         |→ Graphic libraries and            |
@@ -9356,6 +10198,8 @@ Chapter 24. List of target packages available in Buildroot
 |              qwt              |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
+|          rabbitmq-c           |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
 |           racehound           |→ Debugging, profiling and         |
 |                               |benchmark                          |
 |-------------------------------+-----------------------------------|
@@ -9376,6 +10220,8 @@ Chapter 24. List of target packages available in Buildroot
 |           rapidjson           |→ Libraries → JSON/XML             |
 |-------------------------------+-----------------------------------|
 |           rapidxml            |→ Libraries → JSON/XML             |
+|-------------------------------+-----------------------------------|
+|            raptor             |→ Libraries → JSON/XML             |
 |-------------------------------+-----------------------------------|
 |           rdesktop            |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
@@ -9398,6 +10244,8 @@ Chapter 24. List of target packages available in Buildroot
 |         resourceproto         |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |X protocols                        |
+|-------------------------------+-----------------------------------|
+|            rfkill             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |              rgb              |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
@@ -9422,6 +10270,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            rrdtool            |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
+|           rs485conf           |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |          rsh-redone           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -9451,11 +10301,13 @@ Chapter 24. List of target packages available in Buildroot
 |             ruby              |→ Interpreter languages and        |
 |                               |scripting                          |
 |-------------------------------+-----------------------------------|
-|      samba (deprecated)       |→ Networking applications          |
+|             runc              |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |            samba4             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |         sane-backends         |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|              sbc              |→ Libraries → Audio/Sound          |
 |-------------------------------+-----------------------------------|
 |          sconeserver          |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -9472,12 +10324,23 @@ Chapter 24. List of target packages available in Buildroot
 |                               |applications (graphic/text) → X11R7|
 |                               |X protocols                        |
 |-------------------------------+-----------------------------------|
+|             scrub             |→ System tools                     |
+|-------------------------------+-----------------------------------|
 |            scrypt             |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |              SDL              |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |             sdl2              |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
+|           sdl2_gfx            |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
+|          sdl2_image           |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
+|           sdl2_ttf            |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |            SDL_gfx            |→ Graphic libraries and            |
@@ -9523,6 +10386,8 @@ Chapter 24. List of target packages available in Buildroot
 |       shared-mime-info        |→ Miscellaneous                    |
 |-------------------------------+-----------------------------------|
 |    shareware Doom WAD file    |→ Games                            |
+|-------------------------------+-----------------------------------|
+|          shellinabox          |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |           showfont            |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
@@ -9570,9 +10435,11 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           softether           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
-|     sound-theme-borealis      |→ Fonts, icons, sounds and themes  |
+|     sound-theme-borealis      |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
-|    sound-theme-freedesktop    |→ Fonts, icons, sounds and themes  |
+|    sound-theme-freedesktop    |→ Fonts, cursors, icons, sounds and|
+|                               |themes                             |
 |-------------------------------+-----------------------------------|
 |              sox              |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
@@ -9581,6 +10448,10 @@ Chapter 24. List of target packages available in Buildroot
 |          spawn-fcgi           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |             speex             |→ Libraries → Audio/Sound          |
+|-------------------------------+-----------------------------------|
+|          sphinxbase           |→ Libraries → Other                |
+|-------------------------------+-----------------------------------|
+|           spi-tools           |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |        spice protocol         |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -9605,13 +10476,15 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            sshpass            |→ Networking applications          |
 |-------------------------------+-----------------------------------|
-|            sstrip             |→ Development tools                |
+|      sstrip (deprecated)      |→ Development tools                |
 |-------------------------------+-----------------------------------|
 |       start-stop-daemon       |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |     startup-notification      |→ Libraries → Other                |
 |-------------------------------+-----------------------------------|
 |          statserial           |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|            stella             |→ Games                            |
 |-------------------------------+-----------------------------------|
 |          stm32flash           |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
@@ -9640,6 +10513,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |          sunxi-mali           |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
+|         supertuxkart          |→ Games                            |
+|-------------------------------+-----------------------------------|
 |          supervisor           |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |          SVG Module           |→ Graphic libraries and            |
@@ -9666,6 +10541,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            systemd            |→ System tools                     |
 |-------------------------------+-----------------------------------|
+|       systemd-bootchart       |→ System tools                     |
+|-------------------------------+-----------------------------------|
 |           sysvinit            |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |             szip              |→ Libraries → Compression and      |
@@ -9676,6 +10553,8 @@ Chapter 24. List of target packages available in Buildroot
 |              tar              |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |         targetcli-fb          |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|             taskd             |→ Miscellaneous                    |
 |-------------------------------+-----------------------------------|
 |              tcl              |→ Interpreter languages and        |
 |                               |scripting                          |
@@ -9692,6 +10571,11 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           tcpreplay           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|             tekui             |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
+|          terminology          |→ Shell and utilities              |
+|-------------------------------+-----------------------------------|
 |             tftpd             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |            thrift             |→ Libraries → Networking           |
@@ -9699,6 +10583,12 @@ Chapter 24. List of target packages available in Buildroot
 |            thttpd             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |            ti-gfx             |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|         ti-sgx-demos          |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|           ti-sgx-km           |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|           ti-sgx-um           |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |            ti-uim             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
@@ -9713,6 +10603,10 @@ Chapter 24. List of target packages available in Buildroot
 |             tinc              |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |           tinyalsa            |→ Libraries → Audio/Sound          |
+|-------------------------------+-----------------------------------|
+|           tinycbor            |→ Libraries → Other                |
+|-------------------------------+-----------------------------------|
+|           tinydtls            |→ Libraries → Crypto               |
 |-------------------------------+-----------------------------------|
 |           tinyhttpd           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -9729,10 +10623,12 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |              tor              |→ Networking applications          |
 |-------------------------------+-----------------------------------|
-|            torsmo             |→ Graphic libraries and            |
+|      torsmo (deprecated)      |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |             tovid             |→ Audio and video applications     |
+|-------------------------------+-----------------------------------|
+|           tpm-tools           |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |           trace-cmd           |→ Debugging, profiling and         |
 |                               |benchmark                          |
@@ -9749,9 +10645,16 @@ Chapter 24. List of target packages available in Buildroot
 |            trinity            |→ Debugging, profiling and         |
 |                               |benchmark                          |
 |-------------------------------+-----------------------------------|
+|           trousers            |→ Libraries → Crypto               |
+|-------------------------------+-----------------------------------|
 |             tslib             |→ Libraries → Hardware handling    |
 |-------------------------------+-----------------------------------|
 |            tstools            |→ Audio and video applications     |
+|-------------------------------+-----------------------------------|
+|            tunctl             |→ Networking applications          |
+|-------------------------------+-----------------------------------|
+|           turbolua            |→ Interpreter languages and        |
+|                               |scripting → Lua libraries/modules  |
 |-------------------------------+-----------------------------------|
 |           tvheadend           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -9762,6 +10665,8 @@ Chapter 24. List of target packages available in Buildroot
 |            twolame            |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
 |         u-boot tools          |→ Hardware handling                |
+|-------------------------------+-----------------------------------|
+|             ubus              |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
 |            udisks             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
@@ -9774,6 +10679,12 @@ Chapter 24. List of target packages available in Buildroot
 |        unionfs (FUSE)         |→ Filesystem and flash utilities   |
 |-------------------------------+-----------------------------------|
 |           unixodbc            |→ Libraries → Database             |
+|-------------------------------+-----------------------------------|
+|             unrar             |→ Compressors and decompressors    |
+|-------------------------------+-----------------------------------|
+|             unscd             |→ System tools                     |
+|-------------------------------+-----------------------------------|
+|             unzip             |→ Compressors and decompressors    |
 |-------------------------------+-----------------------------------|
 |           upmpdcli            |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
@@ -9798,14 +10709,16 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |          util-linux           |→ System tools                     |
 |-------------------------------+-----------------------------------|
-|          util-macros          |→ Graphic libraries and            |
-|                               |applications (graphic/text) → X11R7|
-|                               |Utilities                          |
+|          util-macros          |→ Miscellaneous                    |
 |-------------------------------+-----------------------------------|
 |        ux500-firmware         |→ Hardware handling → Firmware     |
 |-------------------------------+-----------------------------------|
+|           v4l2grab            |→ Audio and video applications     |
+|-------------------------------+-----------------------------------|
 |           valgrind            |→ Debugging, profiling and         |
 |                               |benchmark                          |
+|-------------------------------+-----------------------------------|
+|           valijson            |→ Libraries → JSON/XML             |
 |-------------------------------+-----------------------------------|
 |             vde2              |→ Networking applications          |
 |-------------------------------+-----------------------------------|
@@ -9835,16 +10748,22 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |            w_scan             |→ Hardware handling                |
 |-------------------------------+-----------------------------------|
+|            wavemon            |→ Networking applications          |
+|-------------------------------+-----------------------------------|
 |            wavpack            |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
 |            wayland            |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
+|       wayland-protocols       |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |      webkit (deprecated)      |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |         WebKit Module         |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
-|        webkitgtk 2.4.x        |→ Libraries → Graphics             |
+|           webkitgtk           |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
+| webkitgtk 2.4.x (deprecated)  |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
 |             webp              |→ Libraries → Graphics             |
 |-------------------------------+-----------------------------------|
@@ -9864,6 +10783,8 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |             whois             |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|       wilc1000-firmware       |→ Hardware handling → Firmware     |
+|-------------------------------+-----------------------------------|
 |        windowswmproto         |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |X protocols                        |
@@ -9878,10 +10799,14 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |           wireshark           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
+|           wiringpi            |→ Libraries → Hardware handling    |
+|-------------------------------+-----------------------------------|
 |            wmctrl             |→ Graphic libraries and            |
 |                               |applications (graphic/text)        |
 |-------------------------------+-----------------------------------|
 |        wpa_supplicant         |→ Networking applications          |
+|-------------------------------+-----------------------------------|
+|          wpan-tools           |→ Networking applications          |
 |-------------------------------+-----------------------------------|
 |             wsapi             |→ Interpreter languages and        |
 |                               |scripting → Lua libraries/modules  |
@@ -10000,6 +10925,9 @@ Chapter 24. List of target packages available in Buildroot
 |                               |applications (graphic/text) → X11R7|
 |                               |Applications                       |
 |-------------------------------+-----------------------------------|
+|            xdotool            |→ Graphic libraries and            |
+|                               |applications (graphic/text)        |
+|-------------------------------+-----------------------------------|
 |           xdpyinfo            |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |Applications                       |
@@ -10011,6 +10939,8 @@ Chapter 24. List of target packages available in Buildroot
 |             xedit             |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |Applications                       |
+|-------------------------------+-----------------------------------|
+|              xen              |→ System tools                     |
 |-------------------------------+-----------------------------------|
 |       Xenomai Userspace       |→ Real-Time                        |
 |-------------------------------+-----------------------------------|
@@ -10060,7 +10990,7 @@ Chapter 24. List of target packages available in Buildroot
 |                               |applications (graphic/text) → X11R7|
 |                               |Drivers                            |
 |-------------------------------+-----------------------------------|
-| xf86-input-void (deprecated)  |→ Graphic libraries and            |
+|       xf86-video-amdgpu       |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |Drivers                            |
 |-------------------------------+-----------------------------------|
@@ -10129,6 +11059,10 @@ Chapter 24. List of target packages available in Buildroot
 |                               |Drivers                            |
 |-------------------------------+-----------------------------------|
 |      xf86-video-neomagic      |→ Graphic libraries and            |
+|                               |applications (graphic/text) → X11R7|
+|                               |Drivers                            |
+|-------------------------------+-----------------------------------|
+|      xf86-video-nouveau       |→ Graphic libraries and            |
 |                               |applications (graphic/text) → X11R7|
 |                               |Drivers                            |
 |-------------------------------+-----------------------------------|
@@ -10448,9 +11382,13 @@ Chapter 24. List of target packages available in Buildroot
 |-------------------------------+-----------------------------------|
 |             ympd              |→ Audio and video applications     |
 |-------------------------------+-----------------------------------|
+|             zbar              |→ Libraries → Graphics             |
+|-------------------------------+-----------------------------------|
 |        zd1211-firmware        |→ Hardware handling → Firmware     |
 |-------------------------------+-----------------------------------|
 |            zeromq             |→ Libraries → Networking           |
+|-------------------------------+-----------------------------------|
+|              zip              |→ Compressors and decompressors    |
 |-------------------------------+-----------------------------------|
 |             zlib              |→ Libraries → Compression and      |
 |                               |decompression                      |
@@ -10487,19 +11425,24 @@ corresponding symbols and providers.
 |              |                              |gpu-amd-bin-mx51     |
 |              |                              |(also imx53),        |
 |              |                              |imx-gpu-viv,         |
+|              |                              |mali-t76x,           |
 |              |                              |nvidia-driver (w/    |
 |              |                              |X.org drivers),      |
 |              |                              |nvidia-tegra23       |
 |              |                              |binaries,            |
+|              |                              |odroid-mali,         |
 |              |                              |rpi-userland,        |
-|              |                              |sunxi-mali, ti-gfx   |
+|              |                              |sunxi-mali, ti-gfx,  |
+|              |                              |ti-sgx-um            |
 |--------------+------------------------------+---------------------|
 |    libgl     |BR2_PACKAGE_HAS_LIBGL         |mesa3d (w/ DRI swrast|
 |              |                              |driver), mesa3d (w/  |
 |              |                              |DRI i915 driver),    |
 |              |                              |mesa3d (w/ DRI i965  |
 |              |                              |driver), mesa3d (w/  |
-|              |                              |DRI radeon driver),  |
+|              |                              |DRI nouveau driver), |
+|              |                              |mesa3d (w/ DRI radeon|
+|              |                              |driver),             |
 |              |                              |xf86-video-imx-viv,  |
 |              |                              |nvidia-driver (w/    |
 |              |                              |X.org drivers)       |
@@ -10508,12 +11451,15 @@ corresponding symbols and providers.
 |              |                              |ES), gpu-amd-bin-mx51|
 |              |                              |(also imx53),        |
 |              |                              |imx-gpu-viv,         |
+|              |                              |mali-t76x,           |
 |              |                              |nvidia-driver (w/    |
 |              |                              |X.org drivers),      |
 |              |                              |nvidia-tegra23       |
 |              |                              |binaries,            |
+|              |                              |odroid-mali,         |
 |              |                              |rpi-userland,        |
-|              |                              |sunxi-mali, ti-gfx   |
+|              |                              |sunxi-mali, ti-gfx,  |
+|              |                              |ti-sgx-um            |
 |--------------+------------------------------+---------------------|
 |  libopenmax  |BR2_PACKAGE_HAS_LIBOPENMAX    |bellagio,            |
 |              |                              |nvidia-tegra23       |
@@ -10527,7 +11473,7 @@ corresponding symbols and providers.
 |--------------+------------------------------+---------------------|
 |luainterpreter|BR2_PACKAGE_HAS_LUAINTERPRETER|lua, luajit          |
 |--------------+------------------------------+---------------------|
-|   powervr    |BR2_PACKAGE_HAS_POWERVR       |ti-gfx               |
+|   powervr    |BR2_PACKAGE_HAS_POWERVR       |ti-gfx, ti-sgx-um    |
 |--------------+------------------------------+---------------------|
 |     udev     |BR2_PACKAGE_HAS_UDEV          |eudev, systemd       |
 +-------------------------------------------------------------------+
@@ -10538,6 +11484,12 @@ The following packages are all available in the menu Host utilities.
 
 +------------------+
 |     Packages     |
+|------------------|
+|   host aespipe   |
+|------------------|
+|host android-tools|
+|------------------|
+| host cbootimage  |
 |------------------|
 | host checkpolicy |
 |------------------|
@@ -10557,13 +11509,22 @@ The following packages are all available in the menu Host utilities.
 |------------------|
 |  host faketime   |
 |------------------|
+|    host fwup     |
+|------------------|
 |  host genext2fs  |
 |------------------|
 |  host genimage   |
 |------------------|
 |   host genpart   |
 |------------------|
+|  host gptfdisk   |
+|------------------|
+|       host       |
+|  imx-usb-loader  |
+|------------------|
 |     host jq      |
+|------------------|
+|    host jsmin    |
 |------------------|
 |host lpc3250loader|
 |------------------|
@@ -10574,6 +11535,8 @@ The following packages are all available in the menu Host utilities.
 |      tools       |
 |------------------|
 |   host mtools    |
+|------------------|
+|   host mxsldr    |
 |------------------|
 |       host       |
 |omap-u-boot-utils |
@@ -10594,12 +11557,17 @@ The following packages are all available in the menu Host utilities.
 |------------------|
 | host sunxi-tools |
 |------------------|
+|  host tegrarcm   |
+|------------------|
 |host u-boot tools |
 |------------------|
 | host util-linux  |
 |------------------|
-|   host-imx-usb   |
-|      loader      |
+| host vboot utils |
+|------------------|
+|   host xorriso   |
+|------------------|
+|     host zip     |
 +------------------+
 
 Chapter 27. Deprecated features
@@ -10614,46 +11582,37 @@ depending on BR2_DEPRECATED_SINCE_2013_05 can be removed from 2014.05
 onwards.
 
 +-------------------------------------------------------------------+
-|    Features    |Location                                          |
-|----------------+--------------------------------------------------|
-|    SuperH64    |Target options → Target Architecture              |
-|----------------+--------------------------------------------------|
-|  Linux 3.16.x  |Toolchain → Kernel Headers                        |
-| kernel headers |                                                  |
-|----------------+--------------------------------------------------|
-|  Linux 3.17.x  |Toolchain → Kernel Headers                        |
-| kernel headers |                                                  |
-|----------------+--------------------------------------------------|
-|  Linux 3.19.x  |Toolchain → Kernel Headers                        |
-| kernel headers |                                                  |
-|----------------+--------------------------------------------------|
-|  Linux 4.0.x   |Toolchain → Kernel Headers                        |
-| kernel headers |                                                  |
-|----------------+--------------------------------------------------|
-|     eglibc     |Toolchain → C library                             |
-|----------------+--------------------------------------------------|
-|   gcc 4.5.x    |Toolchain → GCC compiler Version                  |
-|----------------+--------------------------------------------------|
-|   gdb 7.7.x    |Toolchain → GDB debugger Version                  |
-|----------------+--------------------------------------------------|
-|xf86-input-void |Target packages → Graphic libraries and           |
-|                |applications (graphic/text) → X11R7 Drivers       |
-|----------------+--------------------------------------------------|
-|    libgail     |Target packages → Libraries → Graphics            |
-|----------------+--------------------------------------------------|
-|    libungif    |Target packages → Libraries → Graphics            |
-|----------------+--------------------------------------------------|
-|     webkit     |Target packages → Libraries → Graphics            |
-|----------------+--------------------------------------------------|
-|      cups      |Target packages → Networking applications         |
-|----------------+--------------------------------------------------|
-|foomatic_filters|Target packages → Networking applications         |
-|----------------+--------------------------------------------------|
-|   gutenprint   |Target packages → Networking applications         |
-|----------------+--------------------------------------------------|
-|     hplip      |Target packages → Networking applications         |
-|----------------+--------------------------------------------------|
-|     samba      |Target packages → Networking applications         |
-|----------------+--------------------------------------------------|
-|custom patch dir|Bootloaders                                       |
+|     Features      |Location                                       |
+|-------------------+-----------------------------------------------|
+|     SuperH64      |Target options → Target Architecture           |
+|-------------------+-----------------------------------------------|
+|Linux 3.19.x kernel|Toolchain → Kernel Headers                     |
+|      headers      |                                               |
+|-------------------+-----------------------------------------------|
+|Linux 4.0.x kernel |Toolchain → Kernel Headers                     |
+|      headers      |                                               |
+|-------------------+-----------------------------------------------|
+|Linux 4.2.x kernel |Toolchain → Kernel Headers                     |
+|      headers      |                                               |
+|-------------------+-----------------------------------------------|
+|Linux 4.3.x kernel |Toolchain → Kernel Headers                     |
+|      headers      |                                               |
+|-------------------+-----------------------------------------------|
+|     gcc 4.7.x     |Toolchain → GCC compiler Version               |
+|-------------------+-----------------------------------------------|
+|  kodi-addon-xvdr  |Target packages → Audio and video applications |
+|                   |→ PVR addons                                   |
+|-------------------+-----------------------------------------------|
+|      sstrip       |Target packages → Development tools            |
+|-------------------+-----------------------------------------------|
+|      torsmo       |Target packages → Graphic libraries and        |
+|                   |applications (graphic/text)                    |
+|-------------------+-----------------------------------------------|
+|      libgail      |Target packages → Libraries → Graphics         |
+|-------------------+-----------------------------------------------|
+|      webkit       |Target packages → Libraries → Graphics         |
+|-------------------+-----------------------------------------------|
+|  webkitgtk 2.4.x  |Target packages → Libraries → Graphics         |
+|-------------------+-----------------------------------------------|
+|       ipkg        |Target packages → Package managers             |
 +-------------------------------------------------------------------+

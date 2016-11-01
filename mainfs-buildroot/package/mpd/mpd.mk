@@ -5,12 +5,13 @@
 ################################################################################
 
 MPD_VERSION_MAJOR = 0.19
-MPD_VERSION = $(MPD_VERSION_MAJOR).11
+MPD_VERSION = $(MPD_VERSION_MAJOR).17
 MPD_SOURCE = mpd-$(MPD_VERSION).tar.xz
 MPD_SITE = http://www.musicpd.org/download/mpd/$(MPD_VERSION_MAJOR)
 MPD_DEPENDENCIES = host-pkgconf boost libglib2
 MPD_LICENSE = GPLv2+
 MPD_LICENSE_FILES = COPYING
+MPD_AUTORECONF = YES
 
 # Some options need an explicit --disable or --enable
 
@@ -90,6 +91,12 @@ MPD_DEPENDENCIES += flac
 MPD_CONF_OPTS += --enable-flac
 else
 MPD_CONF_OPTS += --disable-flac
+endif
+
+ifeq ($(BR2_PACKAGE_MPD_HTTPD_OUTPUT),y)
+MPD_CONF_OPTS += --enable-httpd-output
+else
+MPD_CONF_OPTS += --disable-httpd-output
 endif
 
 ifeq ($(BR2_PACKAGE_MPD_JACK2),y)
@@ -186,6 +193,13 @@ MPD_DEPENDENCIES += pulseaudio
 MPD_CONF_OPTS += --enable-pulse
 else
 MPD_CONF_OPTS += --disable-pulse
+endif
+
+ifeq ($(BR2_PACKAGE_MPD_SHOUTCAST),y)
+MPD_DEPENDENCIES += libshout
+MPD_CONF_OPTS += --enable-shout
+else
+MPD_CONF_OPTS += --disable-shout
 endif
 
 ifeq ($(BR2_PACKAGE_MPD_SOUNDCLOUD),y)

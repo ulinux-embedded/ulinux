@@ -67,6 +67,7 @@ config BR2_PACKAGE_PHP_EXT_HASH
 
 config BR2_PACKAGE_PHP_EXT_MCRYPT
 	bool "mcrypt"
+	select BR2_PACKAGE_LIBMCRYPT
 	help
 	  mcrypt support
 
@@ -110,22 +111,12 @@ config BR2_PACKAGE_PHP_EXT_DBA_INI
 
 endif
 
-config BR2_PACKAGE_PHP_EXT_MYSQL
-	bool "Mysql"
-	depends on BR2_INSTALL_LIBSTDCPP
-	depends on BR2_USE_MMU # mysql
-	depends on BR2_TOOLCHAIN_HAS_THREADS # mysql
-	select BR2_PACKAGE_MYSQL
-	help
-	  MySQL support
-
 config BR2_PACKAGE_PHP_EXT_MYSQLI
 	bool "Mysqli"
 	depends on BR2_INSTALL_LIBSTDCPP
 	depends on BR2_USE_MMU # mysql
 	depends on BR2_TOOLCHAIN_HAS_THREADS # mysql
 	select BR2_PACKAGE_MYSQL
-	select BR2_PACKAGE_PHP_EXT_MYSQL
 	help
 	  MySQL Improved extension support
 
@@ -206,13 +197,11 @@ config BR2_PACKAGE_PHP_EXT_INTL
 	depends on BR2_USE_WCHAR
 	depends on !BR2_BINFMT_FLAT # icu
 	depends on BR2_TOOLCHAIN_HAS_THREADS # icu
-	depends on BR2_ARCH_HAS_ATOMICS # icu
 	help
 	  Internationalization support
 
 comment "intl support needs a toolchain w/ C++, wchar, threads"
 	depends on !BR2_BINFMT_FLAT
-	depends on BR2_ARCH_HAS_ATOMICS
 	depends on !BR2_INSTALL_LIBSTDCPP || !BR2_USE_WCHAR || !BR2_TOOLCHAIN_HAS_THREADS
 
 config BR2_PACKAGE_PHP_EXT_MBSTRING

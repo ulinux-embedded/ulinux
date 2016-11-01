@@ -1,11 +1,10 @@
 config BR2_PACKAGE_ULINUX_DEVICE_DAEMON
         bool "ulinux-device-daemon"
         depends on BR2_PACKAGE_NODEJS
-        depends on BR2_BR2_PACKAGE_NODEJS_4_X
         help
           The Device Daemon component of uLinux. It is responsible for updating the device, among other things.
 
           https://github.com/ulinux-embedded/ulinux-device-daemon
 
-comment "ulinuxdd depends on nodejs>4.0"
-        depends on !BR2_PACKAGE_NODEJS || !BR2_BR2_PACKAGE_NODEJS_4_X
+comment "ulinuxdd depends on nodejs"
+        depends on !BR2_PACKAGE_NODEJS

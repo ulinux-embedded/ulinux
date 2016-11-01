@@ -16,11 +16,19 @@ PURE_FTPD_CONF_OPTS = \
 	--with-puredb \
 	--with-rfc2640
 
+ifeq ($(BR2_PACKAGE_ELFUTILS),y)
+PURE_FTPD_DEPENDENCIES += elfutils
+endif
+
 ifeq ($(BR2_PACKAGE_LIBCAP),y)
 PURE_FTPD_CONF_OPTS += --with-capabilities
 PURE_FTPD_DEPENDENCIES += libcap
 else
 PURE_FTPD_CONF_OPTS += --without-capabilities
+endif
+
+ifeq ($(BR2_PACKAGE_LIBSODIUM),y)
+PURE_FTPD_DEPENDENCIES += libsodium
 endif
 
 ifeq ($(BR2_PACKAGE_OPENSSL),y)
@@ -33,7 +41,7 @@ else
 PURE_FTPD_CONF_OPTS += --without-tls
 endif
 
-ifeq ($(BR2_arc),y)
+ifeq ($(BR2_TOOLCHAIN_SUPPORTS_PIE),)
 PURE_FTPD_CONF_ENV += ax_cv_check_cflags___fPIE=no ax_cv_check_ldflags___fPIE=no
 endif
 

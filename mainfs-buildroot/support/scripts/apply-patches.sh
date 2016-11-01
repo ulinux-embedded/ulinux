@@ -31,6 +31,8 @@
 # applied. The list of the patches applied is stored in '.applied_patches_list'
 # file in the build directory.
 
+set -e
+
 silent=
 if [ "$1" = "-s" ] ; then
     # add option to be used by the patch tool
@@ -63,47 +65,59 @@ find ${builddir}/ '(' -name '*.rej' -o -name '.*.rej' ')' -print0 | \
     xargs -0 -r rm -f
 
 function apply_patch {
-    path=$1
-    patch=$2
+    path="${1%%/}"
+    patch="${2}"
+    case "${path}" in
+        /*) ;;
+        *)  path="$PWD/${path}";;
+    esac
     if [ "$3" ]; then
         type="series"; uncomp="cat"
     else
         case "$patch" in
-	    *.gz)
-	    type="gzip"; uncomp="gunzip -dc"; ;;
-	    *.bz)
-	    type="bzip"; uncomp="bunzip -dc"; ;;
-	    *.bz2)
-	    type="bzip2"; uncomp="bunzip2 -dc"; ;;
-	    *.xz)
-	    type="xz"; uncomp="unxz -dc"; ;;
-	    *.zip)
-	    type="zip"; uncomp="unzip -d"; ;;
-	    *.Z)
-	    type="compress"; uncomp="uncompress -c"; ;;
-	    *.diff*)
-	    type="diff"; uncomp="cat"; ;;
-	    *.patch*)
-	    type="patch"; uncomp="cat"; ;;
-	    *)
-	    echo "Unsupported file type for ${path}/${patch}, skipping";
-	    return 0
-	    ;;
+            *.gz)
+            type="gzip"; uncomp="gunzip -dc"; ;;
+            *.bz)
+            type="bzip"; uncomp="bunzip -dc"; ;;
+            *.bz2)
+            type="bzip2"; uncomp="bunzip2 -dc"; ;;
+            *.xz)
+            type="xz"; uncomp="unxz -dc"; ;;
+            *.zip)
+            type="zip"; uncomp="unzip -d"; ;;
+            *.Z)
+            type="compress"; uncomp="uncompress -c"; ;;
+            *.diff*)
+            type="diff"; uncomp="cat"; ;;
+            *.patch*)
+            type="patch"; uncomp="cat"; ;;
+            *)
+            echo "Unsupported file type for ${path}/${patch}, skipping";
+            return 0
+            ;;
         esac
     fi
     if [ -z "$silent" ] ; then
-	echo ""
-	echo "Applying $patch using ${type}: "
+        echo ""
+        echo "Applying $patch using ${type}: "
     fi
     if [ ! -e "${path}/$patch" ] ; then
-	echo "Error: missing patch file ${path}/$patch"
-	exit 1
+        echo "Error: missing patch file ${path}/$patch"
+        exit 1
     fi
-    echo $patch >> ${builddir}/.applied_patches_list
+    existing="$(grep -E "/${patch}\$" ${builddir}/.applied_patches_list || true)"
+    if [ -n "${existing}" ]; then
+        echo "Error: duplicate filename '${patch}'"
+        echo "Conflicting files are:"
+        echo "  already applied: ${existing}"
+        echo "  to be applied  : ${path}/${patch}"
+        exit 1
+    fi
+    echo "${path}/${patch}" >> ${builddir}/.applied_patches_list
     ${uncomp} "${path}/$patch" | patch -g0 -p1 -E -d "${builddir}" -t -N $silent
     if [ $? != 0 ] ; then
         echo "Patch failed!  Please fix ${patch}!"
-	exit 1
+        exit 1
     fi
 }
 
@@ -115,7 +129,13 @@ function scan_patchdir {
     # If there is a series file, use it instead of using ls sort order
     # to apply patches. Skip line starting with a dash.
     if [ -e "${path}/series" ] ; then
-        for i in `grep -Ev "^#" ${path}/series 2> /dev/null` ; do
+        # The format of a series file accepts a second field that is
+        # used to specify the number of directory components to strip
+        # when applying the patch, in the form -pN (N an integer >= 0)
+        # We assume this field to always be -p1 whether it is present
+        # or missing.
+        series_patches="`grep -Ev "^#" ${path}/series | cut -d ' ' -f1 2> /dev/null`"
+        for i in $series_patches; do
             apply_patch "$path" "$i" series
         done
     else
@@ -135,6 +155,7 @@ function scan_patchdir {
     fi
 }
 
+touch ${builddir}/.applied_patches_list
 scan_patchdir "$patchdir" "$patchpattern"
 
 # Check for rejects...
