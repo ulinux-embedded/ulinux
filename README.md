@@ -1,16 +1,5 @@
 # Introduction
 
-# Dependencies Installation
-These are Arch packages. Install the equivalent for your distribution.
-
-- community/arm-none-eabi-gcc
-- community/arm-none-eabi-binutils
-- bc
-- aur/arm-linux-gnueabihf-gcc (to build u-boot)
-
-# Image building process
-
-
 # Customizing considerations
 The `.config.example` file provides a an example configuration for a Raspberry Pi 2 rootfs that includes packages the authors found necessary. Please customize according to the hardware you wish to use.
 
