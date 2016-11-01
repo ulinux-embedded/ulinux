@@ -37,8 +37,8 @@ function createImage {
     echo "Partitioning image for Raspberry Pi" &&
     $SUDO_COMMAND parted /dev/loop0 mktable msdos >>$LOGFILE 2>&1 &&
     $SUDO_COMMAND parted /dev/loop0 mkpart primary fat32 0% 64MB >>$LOGFILE 2>&1 &&
-    $SUDO_COMMAND parted /dev/loop0 mkpart primary ext4 64M 192MB >>$LOGFILE 2>&1 &&
-    $SUDO_COMMAND parted /dev/loop0 mkpart primary ext4 192MB 100% >>$LOGFILE 2>&1 &&
+    $SUDO_COMMAND parted /dev/loop0 mkpart primary ext4 64M 320MB >>$LOGFILE 2>&1 &&
+    $SUDO_COMMAND parted /dev/loop0 mkpart primary ext4 320MB 100% >>$LOGFILE 2>&1 &&
     echo "Creating filesystems for Raspberry Pi" &&
     $SUDO_COMMAND mkdosfs -F 32 -I /dev/loop0p1 >>$LOGFILE 2>&1 &&
     $SUDO_COMMAND mkfs.ext4 /dev/loop0p2 >>$LOGFILE 2>&1 &&
